@@ -394,6 +394,92 @@ body.theme-light .dark-icon { display: inline-block; }
   to { transform: rotate(360deg); }
 }
 
+/* Barra Corporativa de Seleção por Empresa (Razão Social) */
+.company-filter-section {
+  width: 100%;
+}
+
+.company-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-surface-elevated) 100%);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--color-primary);
+}
+
+.company-brand-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.company-badge-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.company-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.company-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.company-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.selected-company-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.company-selector-dropdown-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 320px;
+}
+
+.company-select-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.company-select {
+  width: 100%;
+  font-weight: 600;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.company-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
 /* Navegador de Períodos */
 .period-navigator-section {
   display: flex;
@@ -420,12 +506,12 @@ body.theme-light .dark-icon { display: inline-block; }
 
 .period-tabs-wrapper {
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 6px;
 }
 
 .period-tabs {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
 }
 
@@ -438,20 +524,22 @@ body.theme-light .dark-icon { display: inline-block; }
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 8px 16px;
+  padding: 10px 16px;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s;
-  min-width: 140px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 170px;
+  gap: 4px;
 }
 
 .period-tab-btn:hover {
   background-color: var(--bg-hover);
   color: var(--text-primary);
   border-color: var(--text-muted);
+  transform: translateY(-1px);
 }
 
 .period-tab-btn.active {
@@ -461,9 +549,36 @@ body.theme-light .dark-icon { display: inline-block; }
   box-shadow: 0 0 0 1px var(--color-primary);
 }
 
+.tab-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+
 .tab-comp {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.tab-empresa-pill {
+  font-size: 0.68rem;
+  font-weight: 600;
+  background-color: rgba(59, 130, 246, 0.15);
+  color: var(--color-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.period-tab-btn.active .tab-empresa-pill {
+  background-color: var(--color-primary);
+  color: #ffffff;
 }
 
 .tab-sub {
@@ -473,6 +588,29 @@ body.theme-light .dark-icon { display: inline-block; }
 
 .period-tab-btn.active .tab-sub {
   color: var(--color-primary);
+  font-weight: 500;
+}
+
+/* Banner de Informações do Período e Empresa */
+.banner-empresa-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.badge-company {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
+  color: var(--color-primary);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.banner-empresa-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 /* Banner de Informações do Período */

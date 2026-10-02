@@ -49,12 +49,23 @@ def parse_folha_pdf(pdf_path_or_bytes):
             
             # Detectar Razão Social / CNPJ se ainda não achou
             if not empresa_info["razao_social"]:
-                m_rz = re.search(r'Raz[^\n:]+Social:\s*([^\n\r]+?)(?:\s+P[^\n:]+g:|\n|$)', text)
-                if m_rz:
+                # Procura por Razão Social parando antes de Pág/Pg, CNPJ, Data ou quebra de linha
+                m_rz = re.search(r'Raz[^\n:]*Social:\s*(.*?)(?:\s+P[^\n\s:]*g:\s*\d+|\s{2,}\S+:\s*\d+|\r?\n|$)', text, re.IGNORECASE)
+                if m_rz and m_rz.group(1).strip():
                     empresa_info["razao_social"] = m_rz.group(1).strip()
+                else:
+                    # Fallback com texto direto caso não encontre no layout
+                    try:
+                        raw_t = page.extract_text() or ""
+                        m_rz_raw = re.search(r'Raz[^\n:]*Social:\s*(.*?)(?:\s+P[^\n\s:]*g:|\r?\n|$)', raw_t, re.IGNORECASE)
+                        if m_rz_raw and m_rz_raw.group(1).strip():
+                            empresa_info["razao_social"] = m_rz_raw.group(1).strip()
+                    except Exception:
+                        pass
+
             if not empresa_info["cnpj"]:
-                m_cnpj = re.search(r'CNPJ/CEI:\s*([\d\.\/\-]+)', text)
-                if m_cnpj:
+                m_cnpj = re.search(r'CNPJ(?:/CEI)?:\s*([\d\.\/\-]+)', text)
+                if m_cnpj and m_cnpj.group(1).strip():
                     empresa_info["cnpj"] = m_cnpj.group(1).strip()
 
             # Detectar Período de pagamento

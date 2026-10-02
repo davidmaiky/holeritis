@@ -11,10 +11,12 @@ Sistema desenvolvido sob medida para **extração automatizada de dados de folha
    - Trata continuidade de colaboradores divididos entre quebras de página.
    - Ignora seções de resumo corporativo ou guias de recolhimento GPS para não duplicar valores.
 
-2. **Armazenamento Classificado por Período**:
-   - Banco de dados relacional **SQLite** (`data/holerites.db`) com integridade referencial.
-   - Histórico permanente de períodos importados (ex: `08/2026`, `09/2026`, etc.).
-   - Suporte a múltiplos períodos simultâneos com navegação instantânea em abas.
+2. **Gestão Multi-Empresa & Separação por Razão Social**:
+   - Identificação e extração precisa da **Razão Social** e **CNPJ** no cabeçalho do PDF.
+   - **Chave de unicidade composta (Empresa + Período)**: você pode subir PDFs de empresas distintas para o mesmo mês/competência (ex: Agosto/2026 da Empresa A e da Empresa B) sem que um sobrescreva o outro.
+   - Ao reenviar uma folha corrigida da mesma empresa, o sistema atualiza exclusivamente o registro daquela empresa e daquele período.
+   - **Seletor de Razão Social no Painel**: permite alternar a visualização entre "Todas as Empresas (Visão Global)" ou focar em uma empresa específica.
+   - **Abas Inteligentes**: exibem a Razão Social da empresa em destaque quando na visualização global.
 
 3. **Dashboard & Relatórios Gerenciais**:
    - **Indicadores Chave (6 KPIs)**: Total de Colaboradores, Soma de Salários Base, Total de Proventos, Total de Adiantamento Anterior, Total de Descontos e Total Líquido a Pagar.

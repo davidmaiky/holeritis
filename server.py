@@ -49,13 +49,27 @@ class HoleriteRequestHandler(SimpleHTTPRequestHandler):
         path = parsed.path.rstrip("/")
         query = urllib.parse.parse_qs(parsed.query)
 
+        # Rota de Lista de Empresas (Razões Sociais)
+        if path == "/api/empresas":
+            try:
+                empresas = database.listar_empresas()
+                self._send_json(200, {
+                    "success": True,
+                    "empresas": empresas
+                })
+            except Exception as e:
+                self._send_error(500, f"Erro ao listar empresas: {str(e)}")
+            return
+
         # Rota de Períodos
         if path == "/api/periodos":
             try:
-                periodos = database.listar_periodos()
-                stats = database.estatisticas_gerais()
+                empresa_filtro = query.get("empresa", [None])[0]
+                periodos = database.listar_periodos(empresa=empresa_filtro)
+                stats = database.estatisticas_gerais(empresa=empresa_filtro)
                 self._send_json(200, {
                     "success": True,
+                    "empresa_filtro": empresa_filtro,
                     "periodos": periodos,
                     "stats": stats
                 })
@@ -125,8 +139,9 @@ class HoleriteRequestHandler(SimpleHTTPRequestHandler):
                 content = "\ufeff" + output.getvalue()
                 raw_bytes = content.encode("utf-8")
 
+                safe_empresa = re.sub(r'[^a-zA-Z0-9_\-]', '_', rel.get('empresa', 'empresa'))[:25]
                 safe_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', rel['mes_ano']) or f"periodo_{periodo_id}"
-                filename = f"relatorio_folha_{safe_name}.csv"
+                filename = f"relatorio_folha_{safe_empresa}_{safe_name}.csv"
 
                 self.send_response(200)
                 self.send_header("Content-Type", "text/csv; charset=utf-8")

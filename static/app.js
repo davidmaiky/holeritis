@@ -5,6 +5,8 @@
 
 // Estado Global da Aplicação
 const state = {
+  empresas: [],
+  selectedEmpresa: "", // "" = todas as empresas
   periodos: [],
   currentPeriodoId: null,
   currentRelatorio: null,
@@ -32,6 +34,14 @@ const dom = {
   uploadProgress: document.getElementById("upload-progress"),
   uploadStatusText: document.getElementById("upload-status-text"),
   
+  // Elementos da Empresa / Razão Social
+  companyFilterSelect: document.getElementById("company-filter-select"),
+  selectedCompanyTitle: document.getElementById("selected-company-title"),
+  companyCountBadge: document.getElementById("company-count-badge"),
+  periodContextHint: document.getElementById("period-context-hint"),
+  viewEmpresaNome: document.getElementById("view-empresa-nome"),
+  bannerEmpresaTag: document.getElementById("banner-empresa-tag"),
+
   periodTabs: document.getElementById("period-tabs"),
   reportView: document.getElementById("report-view"),
   emptyState: document.getElementById("empty-state"),
@@ -139,11 +149,21 @@ function initTheme() {
 async function initApp() {
   initTheme();
   setupEventListeners();
+  await loadEmpresas();
   await loadPeriodos();
 }
 
 // Configuração de Eventos
 function setupEventListeners() {
+  // Filtro de Empresa / Razão Social
+  if (dom.companyFilterSelect) {
+    dom.companyFilterSelect.addEventListener("change", async (e) => {
+      state.selectedEmpresa = e.target.value;
+      updateCompanyDisplay();
+      await loadPeriodos();
+    });
+  }
+
   // Painel de Upload
   dom.btnOpenUpload.addEventListener("click", () => {
     dom.uploadPanel.classList.remove("hidden");
@@ -273,10 +293,72 @@ function setupEventListeners() {
   dom.btnDeletePeriodo.addEventListener("click", confirmDeletePeriodo);
 }
 
-// Carregar lista de períodos da API
+// Carregar empresas cadastradas da API
+async function loadEmpresas(selectEmpresa = null) {
+  try {
+    const res = await fetch("/api/empresas");
+    const data = await res.json();
+    if (data.success) {
+      state.empresas = data.empresas || [];
+      renderCompanySelector(selectEmpresa);
+    }
+  } catch (err) {
+    console.error("Erro ao carregar lista de empresas:", err);
+  }
+}
+
+// Renderizar opções do seletor corporativo de empresas
+function renderCompanySelector(selectEmpresa = null) {
+  if (selectEmpresa !== null) {
+    state.selectedEmpresa = selectEmpresa;
+  }
+
+  const count = state.empresas.length;
+  if (dom.companyCountBadge) {
+    dom.companyCountBadge.textContent = `${count} ${count === 1 ? "Empresa" : "Empresas"}`;
+  }
+
+  if (dom.companyFilterSelect) {
+    const currentVal = state.selectedEmpresa;
+    dom.companyFilterSelect.innerHTML = `<option value="">🏢 Todas as Empresas (Visão Global)</option>`;
+
+    state.empresas.forEach(emp => {
+      const opt = document.createElement("option");
+      opt.value = emp.empresa;
+      const countLabel = emp.total_periodos === 1 ? "1 folha" : `${emp.total_periodos} folhas`;
+      opt.textContent = `🏢 ${emp.empresa} (${countLabel})`;
+      dom.companyFilterSelect.appendChild(opt);
+    });
+
+    dom.companyFilterSelect.value = currentVal || "";
+  }
+
+  updateCompanyDisplay();
+}
+
+// Atualizar título visual e contexto da empresa ativa
+function updateCompanyDisplay() {
+  if (dom.selectedCompanyTitle) {
+    dom.selectedCompanyTitle.textContent = state.selectedEmpresa || "Todas as Empresas (Visão Global)";
+  }
+  if (dom.periodContextHint) {
+    if (state.selectedEmpresa) {
+      dom.periodContextHint.textContent = `Exibindo folhas da empresa: ${state.selectedEmpresa}`;
+    } else {
+      dom.periodContextHint.textContent = "Classificação automática por Razão Social e competência";
+    }
+  }
+}
+
+// Carregar lista de períodos da API (com filtro opcional de empresa)
 async function loadPeriodos(selectPeriodoId = null) {
   try {
-    const res = await fetch("/api/periodos");
+    let url = "/api/periodos";
+    if (state.selectedEmpresa) {
+      url += `?empresa=${encodeURIComponent(state.selectedEmpresa)}`;
+    }
+
+    const res = await fetch(url);
     const data = await res.json();
 
     if (!data.success) {
@@ -289,7 +371,9 @@ async function loadPeriodos(selectPeriodoId = null) {
     if (state.periodos.length === 0) {
       dom.reportView.classList.add("hidden");
       dom.emptyState.classList.remove("hidden");
-      dom.periodTabs.innerHTML = "<span class='tab-placeholder'>Nenhum período cadastrado</span>";
+      dom.periodTabs.innerHTML = "<span class='tab-placeholder'>Nenhum relatório encontrado para este filtro</span>";
+      state.currentPeriodoId = null;
+      state.currentRelatorio = null;
       return;
     }
 
@@ -307,14 +391,23 @@ async function loadPeriodos(selectPeriodoId = null) {
   }
 }
 
-// Renderizar Tabs de Períodos
+// Renderizar Tabs de Períodos com destaque para a Razão Social da Empresa
 function renderPeriodTabs() {
   dom.periodTabs.innerHTML = "";
   state.periodos.forEach(p => {
     const btn = document.createElement("button");
     btn.className = `period-tab-btn ${p.id === state.currentPeriodoId ? "active" : ""}`;
+    
+    // Tag da Razão Social (quando estiver em visão global de todas as empresas)
+    const empresaTag = (!state.selectedEmpresa && p.empresa) 
+      ? `<span class="tab-empresa-pill" title="${p.empresa}">${p.empresa}</span>` 
+      : "";
+
     btn.innerHTML = `
-      <span class="tab-comp">${p.mes_ano || p.periodo_texto}</span>
+      <div class="tab-header-row">
+        <span class="tab-comp">${p.mes_ano || p.periodo_texto}</span>
+        ${empresaTag}
+      </div>
       <span class="tab-sub">${p.total_funcionarios} colaborad. • ${formatBRL(p.total_liquido)}</span>
     `;
     btn.addEventListener("click", () => selectPeriodo(p.id));
@@ -346,9 +439,12 @@ async function selectPeriodo(periodoId) {
 
 // Atualizar interface com o relatório carregado
 function updateViewWithRelatorio(rel) {
+  if (dom.viewEmpresaNome) {
+    dom.viewEmpresaNome.textContent = rel.empresa || "Razão Social Não Identificada";
+  }
   dom.viewPeriodoTexto.textContent = rel.periodo_texto || "Período Selecionado";
   dom.viewCompetencia.textContent = rel.mes_ano || "Folha";
-  dom.viewEmpresaInfo.textContent = `Empresa: ${rel.empresa || "Não informada"} | CNPJ: ${rel.cnpj || "Não informado"} | Arquivo: ${rel.nome_arquivo || "folha.pdf"}`;
+  dom.viewEmpresaInfo.textContent = `CNPJ: ${rel.cnpj || "Não informado"} • Arquivo Original: ${rel.nome_arquivo || "folha.pdf"}`;
 
   // Atualizar cabeçalho de impressão
   if (dom.printEmpresaInfo) dom.printEmpresaInfo.textContent = rel.empresa || "EMPRESA";
@@ -518,10 +614,13 @@ async function handleFileUpload(file) {
       return;
     }
 
-    showToast("Folha de pagamento importada com sucesso!", "success");
+    const importedEmpresa = data.relatorio ? data.relatorio.empresa : "";
+    showToast(`Folha da empresa "${importedEmpresa || 'importada'}" processada com sucesso!`, "success");
     dom.uploadPanel.classList.add("hidden");
     dom.pdfFileInput.value = "";
 
+    // Atualizar seletor de empresas e focar no período importado
+    await loadEmpresas(importedEmpresa || state.selectedEmpresa);
     await loadPeriodos(data.periodo_id);
   } catch (err) {
     console.error(err);
@@ -536,7 +635,8 @@ async function confirmDeletePeriodo() {
   if (!state.currentPeriodoId || !state.currentRelatorio) return;
 
   const nome = state.currentRelatorio.mes_ano || state.currentRelatorio.periodo_texto;
-  if (!confirm(`Deseja realmente excluir o relatório do período "${nome}"?\nEsta ação não poderá ser desfeita.`)) {
+  const empresa = state.currentRelatorio.empresa || "Empresa";
+  if (!confirm(`Deseja realmente excluir o relatório de "${nome}" da empresa "${empresa}"?\nEsta ação não poderá ser desfeita.`)) {
     return;
   }
 
@@ -553,6 +653,7 @@ async function confirmDeletePeriodo() {
 
     showToast("Período excluído com sucesso", "success");
     state.currentPeriodoId = null;
+    await loadEmpresas();
     await loadPeriodos();
   } catch (err) {
     console.error(err);
@@ -574,6 +675,7 @@ function exportToExcel() {
 
   // Montar array de objetos para a planilha
   const rows = items.map(emp => ({
+    "Empresa": rel.empresa || "",
     "Período": rel.periodo_texto,
     "Código": emp.codigo || "",
     "Nome do Colaborador": emp.nome,
@@ -587,6 +689,7 @@ function exportToExcel() {
 
   // Linha de total geral
   rows.push({
+    "Empresa": "",
     "Período": "TOTAL CONSOLIDADO",
     "Código": "",
     "Nome do Colaborador": `${items.length} colaboradores`,
@@ -602,6 +705,7 @@ function exportToExcel() {
 
   // Ajustar largura das colunas
   worksheet["!cols"] = [
+    { wch: 32 }, // Empresa
     { wch: 28 }, // Periodo
     { wch: 10 }, // Codigo
     { wch: 38 }, // Nome
@@ -617,7 +721,9 @@ function exportToExcel() {
   const sheetName = (rel.mes_ano || "Folha").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30);
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
 
-  const safeFileName = `relatorio_folha_${(rel.mes_ano || "periodo").replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
+  const safeEmpresa = (rel.empresa || "empresa").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
+  const safeComp = (rel.mes_ano || "periodo").replace(/[^a-zA-Z0-9]/g, "_");
+  const safeFileName = `relatorio_folha_${safeEmpresa}_${safeComp}.xlsx`;
   XLSX.writeFile(workbook, safeFileName);
   showToast("Planilha Excel gerada com sucesso!", "success");
 }

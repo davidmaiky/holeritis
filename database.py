@@ -60,14 +60,31 @@ def init_db():
 
 def salvar_relatorio(resumo, employees, nome_arquivo=""):
     """
-    Armazena o relatório extraído classificado por período.
-    Se o período já existir para a mesma empresa/período_texto, remove o anterior e insere o atualizado.
+    Armazena o relatório extraído classificado por período e Razão Social (Empresa).
+    Se o período já existir para a MESMA empresa, remove o anterior e insere o atualizado.
+    Se for uma empresa diferente no mesmo período, cria um novo registro independente!
     """
     conn = get_connection()
     with conn:
-        # Verificar se já existe registro desse mesmo período
+        empresa_nome = (resumo.get("empresa") or "").strip()
+        cnpj = (resumo.get("cnpj") or "").strip()
+        periodo_texto = (resumo.get("periodo_texto") or "").strip()
+
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM periodos WHERE periodo_texto = ?", (resumo["periodo_texto"],))
+        # Verificar se já existe registro dessa mesma empresa e mesmo período
+        if cnpj:
+            cursor.execute("""
+                SELECT id FROM periodos 
+                WHERE periodo_texto = ? 
+                  AND (LOWER(TRIM(empresa)) = LOWER(TRIM(?)) OR cnpj = ?)
+            """, (periodo_texto, empresa_nome, cnpj))
+        else:
+            cursor.execute("""
+                SELECT id FROM periodos 
+                WHERE periodo_texto = ? 
+                  AND LOWER(TRIM(empresa)) = LOWER(TRIM(?))
+            """, (periodo_texto, empresa_nome))
+
         existente = cursor.fetchone()
         
         if existente:
@@ -145,21 +162,56 @@ def salvar_relatorio(resumo, employees, nome_arquivo=""):
     conn.close()
     return periodo_id
 
-def listar_periodos():
+def listar_empresas():
     """
-    Retorna a lista de todos os períodos classificados em ordem decrescente de criação/data.
+    Retorna a lista distinta de empresas (Razões Sociais) cadastradas e quantidades associadas.
     """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT 
-            id, periodo_texto, mes_ano, empresa, cnpj,
-            total_funcionarios, total_salario, total_proventos,
-            total_adiantamento, total_descontos, total_liquido,
-            nome_arquivo, criado_em
+            empresa,
+            COALESCE(cnpj, '') as cnpj,
+            COUNT(id) as total_periodos,
+            SUM(total_funcionarios) as total_colaboradores,
+            MAX(id) as ultimo_periodo_id
         FROM periodos
-        ORDER BY id DESC
+        WHERE empresa IS NOT NULL AND TRIM(empresa) != ''
+        GROUP BY empresa
+        ORDER BY empresa ASC
     """)
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows
+
+def listar_periodos(empresa=None):
+    """
+    Retorna a lista de todos os períodos classificados em ordem decrescente.
+    Se empresa for informada, filtra os períodos correspondentes àquela Razão Social.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    if empresa and empresa.strip():
+        cursor.execute("""
+            SELECT 
+                id, periodo_texto, mes_ano, empresa, cnpj,
+                total_funcionarios, total_salario, total_proventos,
+                total_adiantamento, total_descontos, total_liquido,
+                nome_arquivo, criado_em
+            FROM periodos
+            WHERE LOWER(TRIM(empresa)) = LOWER(TRIM(?))
+            ORDER BY id DESC
+        """, (empresa.strip(),))
+    else:
+        cursor.execute("""
+            SELECT 
+                id, periodo_texto, mes_ano, empresa, cnpj,
+                total_funcionarios, total_salario, total_proventos,
+                total_adiantamento, total_descontos, total_liquido,
+                nome_arquivo, criado_em
+            FROM periodos
+            ORDER BY id DESC
+        """)
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return rows
@@ -199,20 +251,35 @@ def excluir_periodo(periodo_id):
     conn.close()
     return True
 
-def estatisticas_gerais():
+def estatisticas_gerais(empresa=None):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) as count FROM periodos")
-    total_periodos = cursor.fetchone()["count"]
+    if empresa and empresa.strip():
+        cursor.execute("SELECT COUNT(*) as count FROM periodos WHERE LOWER(TRIM(empresa)) = LOWER(TRIM(?))", (empresa.strip(),))
+        total_periodos = cursor.fetchone()["count"]
 
-    cursor.execute("""
-        SELECT 
-            SUM(total_funcionarios) as soma_func,
-            SUM(total_proventos) as soma_proventos,
-            SUM(total_adiantamento) as soma_adiantamento,
-            SUM(total_liquido) as soma_liquido
-        FROM periodos
-    """)
+        cursor.execute("""
+            SELECT 
+                SUM(total_funcionarios) as soma_func,
+                SUM(total_proventos) as soma_proventos,
+                SUM(total_adiantamento) as soma_adiantamento,
+                SUM(total_liquido) as soma_liquido
+            FROM periodos
+            WHERE LOWER(TRIM(empresa)) = LOWER(TRIM(?))
+        """, (empresa.strip(),))
+    else:
+        cursor.execute("SELECT COUNT(*) as count FROM periodos")
+        total_periodos = cursor.fetchone()["count"]
+
+        cursor.execute("""
+            SELECT 
+                SUM(total_funcionarios) as soma_func,
+                SUM(total_proventos) as soma_proventos,
+                SUM(total_adiantamento) as soma_adiantamento,
+                SUM(total_liquido) as soma_liquido
+            FROM periodos
+        """)
+
     row = cursor.fetchone()
     conn.close()
     return {

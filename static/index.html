@@ -94,12 +94,51 @@
       </div>
     </section>
 
+    <!-- Barra Corporativa de Seleção por Empresa (Razão Social) -->
+    <section class="company-filter-section">
+      <div class="company-filter-bar card">
+        <div class="company-brand-meta">
+          <div class="company-badge-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+              <path d="M9 22v-4h6v4"></path>
+              <path d="M8 6h.01"></path>
+              <path d="M16 6h.01"></path>
+              <path d="M12 6h.01"></path>
+              <path d="M12 10h.01"></path>
+              <path d="M12 14h.01"></path>
+              <path d="M16 10h.01"></path>
+              <path d="M16 14h.01"></path>
+              <path d="M8 10h.01"></path>
+              <path d="M8 14h.01"></path>
+            </svg>
+          </div>
+          <div class="company-text-group">
+            <div class="company-subtitle-row">
+              <span class="company-tag">EMPRESA / RAZÃO SOCIAL</span>
+              <span id="company-count-badge" class="badge badge-info">1 Empresa</span>
+            </div>
+            <h2 id="selected-company-title" class="selected-company-name">Todas as Empresas</h2>
+          </div>
+        </div>
+
+        <div class="company-selector-dropdown-wrap">
+          <label for="company-filter-select" class="company-select-label">Filtrar Relatórios por Razão Social:</label>
+          <div class="select-with-icon">
+            <select id="company-filter-select" class="form-select company-select">
+              <option value="">🏢 Todas as Empresas (Visão Global)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Barra de Períodos Armazenados -->
     <section class="period-navigator-section">
       <div class="section-header-compact">
         <div class="period-title-wrap">
-          <span class="badge badge-info">Períodos Armazenados</span>
-          <span class="helper-text">Classificação automática por competência</span>
+          <span class="badge badge-info">Folhas e Períodos</span>
+          <span id="period-context-hint" class="helper-text">Classificação automática por Razão Social e competência</span>
         </div>
         <div class="period-tabs-wrapper">
           <div id="period-tabs" class="period-tabs">
@@ -116,11 +155,15 @@
       <!-- Detalhes do Período Selecionado -->
       <section class="period-summary-banner">
         <div class="banner-info">
+          <div class="banner-empresa-header">
+            <span class="badge badge-company" id="banner-empresa-tag">🏢 Razão Social</span>
+            <h3 id="view-empresa-nome" class="banner-empresa-title">Razão Social da Empresa</h3>
+          </div>
           <div class="banner-title-group">
             <h2 id="view-periodo-texto">Carregando...</h2>
             <span id="view-competencia" class="badge badge-competencia">--/----</span>
           </div>
-          <p id="view-empresa-info" class="banner-empresa">Empresa: -- | CNPJ: --</p>
+          <p id="view-empresa-info" class="banner-empresa">CNPJ: -- | Arquivo: --</p>
         </div>
 
         <div class="banner-actions">
