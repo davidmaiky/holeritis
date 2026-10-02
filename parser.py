@@ -30,8 +30,9 @@ def parse_folha_pdf(pdf_path_or_bytes):
     Processa o PDF da folha de pagamento e extrai a lista de funcionários e os dados do período.
     Pode receber o caminho do arquivo ou um file-like object / bytes.
     """
-    if isinstance(pdf_path_or_bytes, (str, os.PathLike)):
-        pdf_ctx = pdfplumber.open(pdf_path_or_bytes)
+    if isinstance(pdf_path_or_bytes, (bytes, bytearray)):
+        import io
+        pdf_ctx = pdfplumber.open(io.BytesIO(pdf_path_or_bytes))
     else:
         pdf_ctx = pdfplumber.open(pdf_path_or_bytes)
 
@@ -41,7 +42,10 @@ def parse_folha_pdf(pdf_path_or_bytes):
 
     with pdf_ctx as pdf:
         for page_idx, page in enumerate(pdf.pages):
-            text = page.extract_text(layout=True) or ""
+            try:
+                text = page.extract_text(layout=True) or ""
+            except Exception:
+                text = page.extract_text() or ""
             
             # Detectar Razão Social / CNPJ se ainda não achou
             if not empresa_info["razao_social"]:
@@ -65,12 +69,15 @@ def parse_folha_pdf(pdf_path_or_bytes):
                         periodo_texto = m_comp.group(1).strip()
 
             # Pular páginas de Resumo e GPS para não misturar os totais gerais com registros de empregados
-            if "R E S U M O" in text or "G P S" in text:
+            if re.search(r'\bR\s*E\s*S\s*U\s*M\s*O\b', text, re.IGNORECASE) or re.search(r'\bG\s*P\s*S\b', text, re.IGNORECASE):
                 continue
 
             for line in text.split("\n"):
                 # Remover cabeçalhos de página para viabilizar continuidade entre páginas
                 if any(h in line for h in ["Folha de Pagamento", "Apelido:", "CNPJ/CEI:", "Endere", "Pg:", "Pág:"]):
+                    continue
+                # Remover linhas de data/hora do cabeçalho do sistema
+                if re.match(r"^\s*\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}:\d{2}", line.strip()):
                     continue
                 if line.strip():
                     cleaned_lines.append(line)

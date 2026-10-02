@@ -171,12 +171,20 @@ class HoleriteRequestHandler(SimpleHTTPRequestHandler):
                         keep_blank_values=True
                     )
 
-                    fileitem = form["file"] if "file" in form else None
-                    if not fileitem or not fileitem.file:
+                    if "file" not in form:
                         self._send_error(400, "Campo 'file' não encontrado no envio")
                         return
 
-                    filename = fileitem.filename or "folha_upload.pdf"
+                    fileitem = form["file"]
+                    if isinstance(fileitem, list):
+                        fileitem = fileitem[0]
+
+                    if getattr(fileitem, "file", None) is None:
+                        self._send_error(400, "Arquivo inválido ou não enviado")
+                        return
+
+                    raw_filename = getattr(fileitem, "filename", None) or "folha_upload.pdf"
+                    filename = Path(raw_filename).name or "folha_upload.pdf"
                     file_bytes = fileitem.file.read()
                 else:
                     # Receber binário direto
