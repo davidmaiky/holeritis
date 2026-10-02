@@ -184,36 +184,105 @@ def listar_empresas():
     conn.close()
     return rows
 
-def listar_periodos(empresa=None):
+def competencia_para_chave(mes_ano_str):
     """
-    Retorna a lista de todos os períodos classificados em ordem decrescente.
-    Se empresa for informada, filtra os períodos correspondentes àquela Razão Social.
+    Converte competência 'MM/AAAA' para inteiro AAAA*100 + MM para ordenação e comparação cronológica.
+    Ex: '08/2026' -> 202608
+    """
+    if not mes_ano_str:
+        return 0
+    parts = str(mes_ano_str).strip().split("/")
+    if len(parts) == 2:
+        try:
+            mm = int(parts[0])
+            aaaa = int(parts[1])
+            return aaaa * 100 + mm
+        except ValueError:
+            pass
+    return 0
+
+def obter_filtros_disponiveis():
+    """
+    Retorna a lista de anos disponíveis, competências distintas ordenadas cronologicamente
+    e empresas cadastradas para alimentar os filtros da interface.
     """
     conn = get_connection()
     cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT mes_ano 
+        FROM periodos 
+        WHERE mes_ano IS NOT NULL AND TRIM(mes_ano) != ''
+    """)
+    comps = [r["mes_ano"] for r in cursor.fetchall()]
+    comps_sorted = sorted(comps, key=competencia_para_chave)
+
+    anos = sorted(list(set(c.split("/")[1] for c in comps_sorted if "/" in c)), reverse=True)
+    conn.close()
+
+    return {
+        "anos": anos,
+        "competencias": comps_sorted
+    }
+
+def listar_periodos(empresa=None, de=None, ate=None, ano=None, preset=None):
+    """
+    Retorna a lista de períodos com filtros opcionais:
+    - empresa: Razão Social da empresa
+    - de: competência inicial (ex: '01/2026')
+    - ate: competência final (ex: '08/2026')
+    - ano: ano das competências (ex: '2026')
+    - preset: 'last_12m', 'last_6m', 'last_3m', 'current_year'
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    query = """
+        SELECT 
+            id, periodo_texto, mes_ano, empresa, cnpj,
+            total_funcionarios, total_salario, total_proventos,
+            total_adiantamento, total_descontos, total_liquido,
+            nome_arquivo, criado_em
+        FROM periodos
+        WHERE 1=1
+    """
+    params = []
+
     if empresa and empresa.strip():
-        cursor.execute("""
-            SELECT 
-                id, periodo_texto, mes_ano, empresa, cnpj,
-                total_funcionarios, total_salario, total_proventos,
-                total_adiantamento, total_descontos, total_liquido,
-                nome_arquivo, criado_em
-            FROM periodos
-            WHERE LOWER(TRIM(empresa)) = LOWER(TRIM(?))
-            ORDER BY id DESC
-        """, (empresa.strip(),))
-    else:
-        cursor.execute("""
-            SELECT 
-                id, periodo_texto, mes_ano, empresa, cnpj,
-                total_funcionarios, total_salario, total_proventos,
-                total_adiantamento, total_descontos, total_liquido,
-                nome_arquivo, criado_em
-            FROM periodos
-            ORDER BY id DESC
-        """)
+        query += " AND LOWER(TRIM(empresa)) = LOWER(TRIM(?))"
+        params.append(empresa.strip())
+
+    if ano and str(ano).strip():
+        query += " AND (mes_ano LIKE ? OR periodo_texto LIKE ?)"
+        params.append(f"%/{str(ano).strip()}")
+        params.append(f"%/{str(ano).strip()}%")
+
+    query += " ORDER BY id DESC"
+    cursor.execute(query, params)
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
+
+    # Filtros em memória baseados em chave cronológica de competência
+    if de or ate:
+        chave_de = competencia_para_chave(de) if de else 0
+        chave_ate = competencia_para_chave(ate) if ate else 999999
+        rows = [r for r in rows if chave_de <= competencia_para_chave(r.get("mes_ano")) <= chave_ate]
+
+    if preset:
+        # Ordenar cronologicamente para aplicar presets móveis
+        sorted_chrono = sorted(rows, key=lambda r: competencia_para_chave(r.get("mes_ano")))
+        if preset == "last_12m":
+            rows = sorted_chrono[-12:]
+        elif preset == "last_6m":
+            rows = sorted_chrono[-6:]
+        elif preset == "last_3m":
+            rows = sorted_chrono[-3:]
+        elif preset == "current_year":
+            from datetime import datetime
+            current_y = datetime.now().year
+            rows = [r for r in rows if str(current_y) in (r.get("mes_ano") or "")]
+        # Reordenar para retorno padrão do sistema (mais recentes primeiro)
+        rows.sort(key=lambda r: r["id"], reverse=True)
+
     return rows
 
 def obter_relatorio(periodo_id):
@@ -251,41 +320,250 @@ def excluir_periodo(periodo_id):
     conn.close()
     return True
 
-def estatisticas_gerais(empresa=None):
-    conn = get_connection()
-    cursor = conn.cursor()
-    if empresa and empresa.strip():
-        cursor.execute("SELECT COUNT(*) as count FROM periodos WHERE LOWER(TRIM(empresa)) = LOWER(TRIM(?))", (empresa.strip(),))
-        total_periodos = cursor.fetchone()["count"]
+def estatisticas_gerais(empresa=None, de=None, ate=None, ano=None):
+    periodos = listar_periodos(empresa=empresa, de=de, ate=ate, ano=ano)
+    
+    total_periodos = len(periodos)
+    soma_func = sum(p["total_funcionarios"] for p in periodos)
+    soma_proventos = sum(p["total_proventos"] for p in periodos)
+    soma_adiantamento = sum(p["total_adiantamento"] for p in periodos)
+    soma_liquido = sum(p["total_liquido"] for p in periodos)
+    soma_descontos = sum(p["total_descontos"] for p in periodos)
 
-        cursor.execute("""
-            SELECT 
-                SUM(total_funcionarios) as soma_func,
-                SUM(total_proventos) as soma_proventos,
-                SUM(total_adiantamento) as soma_adiantamento,
-                SUM(total_liquido) as soma_liquido
-            FROM periodos
-            WHERE LOWER(TRIM(empresa)) = LOWER(TRIM(?))
-        """, (empresa.strip(),))
-    else:
-        cursor.execute("SELECT COUNT(*) as count FROM periodos")
-        total_periodos = cursor.fetchone()["count"]
-
-        cursor.execute("""
-            SELECT 
-                SUM(total_funcionarios) as soma_func,
-                SUM(total_proventos) as soma_proventos,
-                SUM(total_adiantamento) as soma_adiantamento,
-                SUM(total_liquido) as soma_liquido
-            FROM periodos
-        """)
-
-    row = cursor.fetchone()
-    conn.close()
     return {
         "total_periodos": total_periodos,
-        "soma_funcionarios": row["soma_func"] or 0,
-        "soma_proventos": row["soma_proventos"] or 0.0,
-        "soma_adiantamento": row["soma_adiantamento"] or 0.0,
-        "soma_liquido": row["soma_liquido"] or 0.0
+        "soma_funcionarios": soma_func,
+        "soma_proventos": soma_proventos,
+        "soma_adiantamento": soma_adiantamento,
+        "soma_descontos": soma_descontos,
+        "soma_liquido": soma_liquido
     }
+
+def obter_evolucao_12_meses(empresa=None, limite=12, de=None, ate=None, ano=None):
+    """
+    Agrupa e calcula a série histórica de evolução temporal (últimos 12 meses ou janela selecionada)
+    com ênfase na comparação direta entre Total de Proventos, Total de Adiantamentos e Total Líquido.
+    """
+    periodos = listar_periodos(empresa=empresa, de=de, ate=ate, ano=ano)
+    if not periodos:
+        return {
+            "labels": [],
+            "periodos": [],
+            "series": {
+                "proventos": [],
+                "adiantamento": [],
+                "liquido": [],
+                "descontos": [],
+                "salarios": [],
+                "colaboradores": []
+            },
+            "totais": {
+                "total_proventos": 0.0,
+                "media_proventos": 0.0,
+                "total_adiantamento": 0.0,
+                "media_adiantamento": 0.0,
+                "total_liquido": 0.0,
+                "media_liquido": 0.0,
+                "total_descontos": 0.0,
+                "pct_adiantamento_sobre_proventos": 0.0,
+                "pct_liquido_sobre_proventos": 0.0,
+                "mes_maior_folha": "",
+                "mes_menor_folha": ""
+            },
+            "mes_a_mes": []
+        }
+
+    # Ordenar cronologicamente
+    sorted_chrono = sorted(periodos, key=lambda r: competencia_para_chave(r.get("mes_ano")))
+
+    # Se limite for especificado (ex: 12 meses)
+    if limite and len(sorted_chrono) > limite:
+        sorted_chrono = sorted_chrono[-limite:]
+
+    labels = [p.get("mes_ano") or p.get("periodo_texto") for p in sorted_chrono]
+    proventos = [round(p.get("total_proventos", 0.0), 2) for p in sorted_chrono]
+    adiantamentos = [round(p.get("total_adiantamento", 0.0), 2) for p in sorted_chrono]
+    liquidos = [round(p.get("total_liquido", 0.0), 2) for p in sorted_chrono]
+    descontos = [round(p.get("total_descontos", 0.0), 2) for p in sorted_chrono]
+    salarios = [round(p.get("total_salario", 0.0), 2) for p in sorted_chrono]
+    colaboradores = [p.get("total_funcionarios", 0) for p in sorted_chrono]
+
+    count = len(sorted_chrono)
+    soma_prov = sum(proventos)
+    soma_adiant = sum(adiantamentos)
+    soma_liq = sum(liquidos)
+    soma_desc = sum(descontos)
+
+    media_prov = soma_prov / count if count > 0 else 0.0
+    media_adiant = soma_adiant / count if count > 0 else 0.0
+    media_liq = soma_liq / count if count > 0 else 0.0
+
+    pct_adv = (soma_adiant / soma_prov * 100) if soma_prov > 0 else 0.0
+    pct_liq = (soma_liq / soma_prov * 100) if soma_prov > 0 else 0.0
+
+    # Maior e menor mês por proventos
+    max_idx = proventos.index(max(proventos)) if proventos else -1
+    min_idx = proventos.index(min(proventos)) if proventos else -1
+
+    mes_maior = labels[max_idx] if max_idx >= 0 else ""
+    mes_menor = labels[min_idx] if min_idx >= 0 else ""
+
+    # Tabela analítica mês a mês com variações MoM
+    mes_a_mes = []
+    for i, p in enumerate(sorted_chrono):
+        curr_prov = proventos[i]
+        curr_adv = adiantamentos[i]
+        curr_liq = liquidos[i]
+        curr_desc = descontos[i]
+
+        pct_adv_m = (curr_adv / curr_prov * 100) if curr_prov > 0 else 0.0
+        pct_liq_m = (curr_liq / curr_prov * 100) if curr_prov > 0 else 0.0
+
+        var_prov_mom = 0.0
+        var_liq_mom = 0.0
+        if i > 0 and proventos[i-1] > 0:
+            var_prov_mom = ((curr_prov - proventos[i-1]) / proventos[i-1]) * 100
+        if i > 0 and liquidos[i-1] > 0:
+            var_liq_mom = ((curr_liq - liquidos[i-1]) / liquidos[i-1]) * 100
+
+        mes_a_mes.append({
+            "periodo_id": p.get("id"),
+            "mes_ano": labels[i],
+            "periodo_texto": p.get("periodo_texto", ""),
+            "empresa": p.get("empresa", ""),
+            "colaboradores": p.get("total_funcionarios", 0),
+            "proventos": curr_prov,
+            "adiantamento": curr_adv,
+            "descontos": curr_desc,
+            "liquido": curr_liq,
+            "pct_adiantamento": round(pct_adv_m, 1),
+            "pct_liquido": round(pct_liq_m, 1),
+            "var_proventos_mom": round(var_prov_mom, 1),
+            "var_liquido_mom": round(var_liq_mom, 1)
+        })
+
+    return {
+        "labels": labels,
+        "periodos": sorted_chrono,
+        "series": {
+            "proventos": proventos,
+            "adiantamento": adiantamentos,
+            "liquido": liquidos,
+            "descontos": descontos,
+            "salarios": salarios,
+            "colaboradores": colaboradores
+        },
+        "totais": {
+            "total_periodos": count,
+            "total_proventos": round(soma_prov, 2),
+            "media_proventos": round(media_prov, 2),
+            "total_adiantamento": round(soma_adiant, 2),
+            "media_adiantamento": round(media_adiant, 2),
+            "total_liquido": round(soma_liq, 2),
+            "media_liquido": round(media_liq, 2),
+            "total_descontos": round(soma_desc, 2),
+            "pct_adiantamento_sobre_proventos": round(pct_adv, 1),
+            "pct_liquido_sobre_proventos": round(pct_liq, 1),
+            "mes_maior_folha": mes_maior,
+            "mes_menor_folha": mes_menor
+        },
+        "mes_a_mes": mes_a_mes
+    }
+
+def gerar_folhas_demo_12m(empresa_alvo=None):
+    """
+    Gera/completa um histórico de 12 meses contínuos se existirem lacunas,
+    usando a base de funcionários reais existente com variações realistas (horas extras, comissões).
+    Permite ao usuário visualizar imediatamente os gráficos de 12 meses completos.
+    """
+    periodos = listar_periodos()
+    if not periodos:
+        return False
+
+    base_rel = None
+    for p in periodos:
+        if empresa_alvo and p.get("empresa") != empresa_alvo:
+            continue
+        rel = obter_relatorio(p["id"])
+        if rel and len(rel.get("itens", [])) > 0:
+            base_rel = rel
+            break
+
+    if not base_rel:
+        base_rel = obter_relatorio(periodos[0]["id"])
+
+    if not base_rel or not base_rel.get("itens"):
+        return False
+
+    empresa = base_rel.get("empresa", "PRIME PRO EXTREME COSMETICOS INC LTDA")
+    cnpj = base_rel.get("cnpj", "")
+    base_items = base_rel["itens"]
+
+    meses_alvo = [
+        ("01/2026", "01/01/2026 a 31/01/2026", 1.02),
+        ("02/2026", "01/02/2026 a 28/02/2026", 1.08),
+        ("03/2026", "01/03/2026 a 31/03/2026", 0.98),
+        ("04/2026", "01/04/2026 a 30/04/2026", 1.00),
+        ("05/2026", "01/05/2026 a 31/05/2026", 1.01),
+        ("06/2026", "01/06/2026 a 30/06/2026", 1.03),
+        ("07/2026", "01/07/2026 a 31/07/2026", 0.99),
+        ("08/2026", "01/08/2026 a 31/08/2026", 1.02),
+        ("09/2026", "01/09/2026 a 30/09/2026", 1.05),
+        ("10/2026", "01/10/2026 a 31/10/2026", 1.04),
+        ("11/2026", "01/11/2026 a 30/11/2026", 1.12),
+        ("12/2026", "01/12/2026 a 31/12/2026", 1.25),
+    ]
+
+    import random
+    random.seed(42)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    novos_adicionados = 0
+    for mes_ano, per_texto, fator in meses_alvo:
+        cursor.execute("""
+            SELECT id FROM periodos 
+            WHERE mes_ano = ? AND LOWER(TRIM(empresa)) = LOWER(TRIM(?))
+        """, (mes_ano, empresa))
+        if cursor.fetchone():
+            continue
+
+        novos_emps = []
+        for it in base_items:
+            var_pct = random.uniform(0.96, 1.04) * fator
+            sal = round(it["salario"], 2)
+            prov = round(it["proventos"] * var_pct, 2)
+            adiant = round(it["adiantamento_anterior"] * (1.0 if it["adiantamento_anterior"] > 0 else 0), 2)
+            desc = round(it["descontos"] * var_pct, 2)
+            liq = max(0.0, round(prov - desc, 2))
+
+            novos_emps.append({
+                "codigo": it["codigo"],
+                "nome": it["nome"],
+                "funcao": it["funcao"],
+                "salario": sal,
+                "proventos": prov,
+                "descontos": desc,
+                "adiantamento_anterior": adiant,
+                "liquido": liq
+            })
+
+        resumo = {
+            "periodo_texto": per_texto,
+            "mes_ano": mes_ano,
+            "empresa": empresa,
+            "cnpj": cnpj,
+            "total_funcionarios": len(novos_emps),
+            "total_salario": sum(e["salario"] for e in novos_emps),
+            "total_proventos": sum(e["proventos"] for e in novos_emps),
+            "total_adiantamento": sum(e["adiantamento_anterior"] for e in novos_emps),
+            "total_descontos": sum(e["descontos"] for e in novos_emps),
+            "total_liquido": sum(e["liquido"] for e in novos_emps),
+        }
+
+        salvar_relatorio(resumo, novos_emps, f"folha_simulada_{mes_ano.replace('/', '_')}.pdf")
+        novos_adicionados += 1
+
+    conn.close()
+    return novos_adicionados

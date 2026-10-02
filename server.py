@@ -61,15 +61,89 @@ class HoleriteRequestHandler(SimpleHTTPRequestHandler):
                 self._send_error(500, f"Erro ao listar empresas: {str(e)}")
             return
 
-        # Rota de Períodos
+        # Rota de Metadados de Filtros Disponíveis (Anos, Competências)
+        if path == "/api/filtros":
+            try:
+                filtros = database.obter_filtros_disponiveis()
+                empresas = database.listar_empresas()
+                self._send_json(200, {
+                    "success": True,
+                    "anos": filtros["anos"],
+                    "competencias": filtros["competencias"],
+                    "empresas": empresas
+                })
+            except Exception as e:
+                self._send_error(500, f"Erro ao obter filtros: {str(e)}")
+            return
+
+        # Rota de Evolução Histórica e Comparativo de 12 Meses
+        if path == "/api/evolucao-12-meses":
+            try:
+                empresa_filtro = query.get("empresa", [None])[0]
+                limite_str = query.get("limite", ["12"])[0]
+                limite = int(limite_str) if limite_str and limite_str.isdigit() else 12
+                de_filtro = query.get("de", [None])[0]
+                ate_filtro = query.get("ate", [None])[0]
+                ano_filtro = query.get("ano", [None])[0]
+
+                dados_evolucao = database.obter_evolucao_12_meses(
+                    empresa=empresa_filtro,
+                    limite=limite,
+                    de=de_filtro,
+                    ate=ate_filtro,
+                    ano=ano_filtro
+                )
+                self._send_json(200, {
+                    "success": True,
+                    "evolucao": dados_evolucao
+                })
+            except Exception as e:
+                self._send_error(500, f"Erro ao obter evolução de 12 meses: {str(e)}")
+            return
+
+        # Rota de Demonstração (Completar 12 meses para testes rápidos)
+        if path == "/api/demo-12-meses":
+            try:
+                empresa_filtro = query.get("empresa", [None])[0]
+                criados = database.gerar_folhas_demo_12m(empresa_filtro)
+                self._send_json(200, {
+                    "success": True,
+                    "message": f"{criados} folhas adicionadas para completar o histórico de 12 meses!",
+                    "criados": criados
+                })
+            except Exception as e:
+                self._send_error(500, f"Erro ao gerar demo 12 meses: {str(e)}")
+            return
+
+        # Rota de Períodos com Filtros Avançados
         if path == "/api/periodos":
             try:
                 empresa_filtro = query.get("empresa", [None])[0]
-                periodos = database.listar_periodos(empresa=empresa_filtro)
-                stats = database.estatisticas_gerais(empresa=empresa_filtro)
+                de_filtro = query.get("de", [None])[0]
+                ate_filtro = query.get("ate", [None])[0]
+                ano_filtro = query.get("ano", [None])[0]
+                preset_filtro = query.get("preset", [None])[0]
+
+                periodos = database.listar_periodos(
+                    empresa=empresa_filtro,
+                    de=de_filtro,
+                    ate=ate_filtro,
+                    ano=ano_filtro,
+                    preset=preset_filtro
+                )
+                stats = database.estatisticas_gerais(
+                    empresa=empresa_filtro,
+                    de=de_filtro,
+                    ate=ate_filtro,
+                    ano=ano_filtro
+                )
                 self._send_json(200, {
                     "success": True,
                     "empresa_filtro": empresa_filtro,
+                    "de_filtro": de_filtro,
+                    "ate_filtro": ate_filtro,
+                    "ano_filtro": ano_filtro,
+                    "preset_filtro": preset_filtro,
                     "periodos": periodos,
                     "stats": stats
                 })

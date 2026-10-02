@@ -133,6 +133,73 @@
       </div>
     </section>
 
+    <!-- Barra Avançada de Filtros de Datas e Períodos -->
+    <section class="date-filter-section card">
+      <div class="date-filter-bar">
+        <!-- Presets Rápidos de Período -->
+        <div class="filter-preset-group">
+          <span class="filter-group-label">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            Filtro de Período:
+          </span>
+          <div class="preset-pills" id="preset-pills">
+            <button class="preset-pill active" data-preset="all" type="button">Todos</button>
+            <button class="preset-pill" data-preset="last_12m" type="button">🗓️ Últimos 12 Meses</button>
+            <button class="preset-pill" data-preset="last_6m" type="button">6 Meses</button>
+            <button class="preset-pill" data-preset="last_3m" type="button">3 Meses</button>
+            <button class="preset-pill" data-preset="current_year" type="button">Ano 2026</button>
+          </div>
+        </div>
+
+        <!-- Seletores de Data / Competência Inicial e Final e Ano -->
+        <div class="filter-range-group">
+          <div class="range-field">
+            <label for="filter-date-de" class="range-label">De:</label>
+            <select id="filter-date-de" class="form-select date-select">
+              <option value="">Início</option>
+            </select>
+          </div>
+
+          <div class="range-field">
+            <label for="filter-date-ate" class="range-label">Até:</label>
+            <select id="filter-date-ate" class="form-select date-select">
+              <option value="">Fim</option>
+            </select>
+          </div>
+
+          <div class="range-field">
+            <label for="filter-date-ano" class="range-label">Ano:</label>
+            <select id="filter-date-ano" class="form-select date-select year-select">
+              <option value="">Todos</option>
+            </select>
+          </div>
+
+          <!-- Ações do Filtro -->
+          <div class="filter-actions-group">
+            <button id="btn-apply-date-filter" class="btn btn-secondary btn-sm" type="button" title="Aplicar filtros de intervalo">
+              Filtrar
+            </button>
+            <button id="btn-clear-date-filter" class="btn btn-ghost btn-sm hidden" type="button" title="Limpar filtros aplicados">
+              ✕ Limpar
+            </button>
+          </div>
+        </div>
+
+        <!-- Indicador de Status dos Filtros e Botão de Acesso Rápido a Gráficos 12M -->
+        <div class="filter-meta-group">
+          <span id="period-filter-badge" class="badge badge-info">8 Períodos</span>
+          <button id="btn-quick-12m" class="btn btn-primary btn-sm btn-12m-highlight" type="button" title="Abrir comparativo de 12 meses">
+            📈 Ver Gráficos 12M
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- Barra de Períodos Armazenados -->
     <section class="period-navigator-section">
       <div class="section-header-compact">
@@ -281,16 +348,154 @@
       <section id="charts-panel" class="charts-section hidden">
         <!-- Barra de Abas de Gráficos -->
         <div class="chart-tab-bar">
-          <button id="tab-chart-periodo" class="chart-tab-btn active" type="button">
+          <button id="tab-chart-12m" class="chart-tab-btn active" type="button">
+            📈 Comparativo 12 Meses (Proventos vs Adiantamento vs Líquido)
+          </button>
+          <button id="tab-chart-periodo" class="chart-tab-btn" type="button">
             📊 Análise do Período Atual
           </button>
-          <button id="tab-chart-evolucao" class="chart-tab-btn" type="button">
-            📈 Evolução Histórica (Todos os Meses)
+          <button id="tab-chart-headcount" class="chart-tab-btn" type="button">
+            👥 Headcount & Média Salarial
           </button>
         </div>
 
-        <!-- Grupo 1: Gráficos do Período Selecionado -->
-        <div id="charts-periodo-view" class="charts-grid-view">
+        <!-- Grupo 1: Gráfico e Indicadores de Evolução de 12 Meses (Destaque Principal) -->
+        <div id="charts-12m-view" class="charts-12m-view">
+          
+          <!-- Controles do Gráfico de 12 Meses -->
+          <div class="card chart-12m-header-card">
+            <div class="chart-12m-meta">
+              <div class="chart-badge-title">
+                <span class="badge badge-primary">Evolução Analítica</span>
+                <h4>Comparação de 12 Meses: Proventos x Adiantamento Anterior x Líquido</h4>
+              </div>
+              <p class="chart-subtitle">
+                Análise direta entre Remuneração Bruta, Adiantamentos Compensados e Salário Líquido Depositado por competência
+              </p>
+            </div>
+
+            <div class="chart-12m-toolbar">
+              <!-- Seletor de Tipo de Gráfico -->
+              <div class="chart-btn-group">
+                <span class="toolbar-label">Tipo:</span>
+                <button id="btn-chart-type-bar" class="btn-chart-opt active" type="button" title="Barras agrupadas lado a lado">
+                  📊 Barras
+                </button>
+                <button id="btn-chart-type-line" class="btn-chart-opt" type="button" title="Linhas de tendência e áreas">
+                  📈 Linhas
+                </button>
+                <button id="btn-chart-type-stacked" class="btn-chart-opt" type="button" title="Barras empilhadas de composição">
+                  🧱 Empilhado
+                </button>
+              </div>
+
+              <!-- Seletor de Intervalo de Meses no Gráfico -->
+              <div class="chart-btn-group">
+                <span class="toolbar-label">Janela:</span>
+                <button id="btn-range-12m" class="btn-chart-opt active" data-range="12" type="button">12M</button>
+                <button id="btn-range-6m" class="btn-chart-opt" data-range="6" type="button">6M</button>
+                <button id="btn-range-all" class="btn-chart-opt" data-range="all" type="button">Tudo</button>
+              </div>
+
+              <!-- Botão Opcional para Demonstração de 12 Meses Contínuos -->
+              <button id="btn-seed-12m" class="btn btn-ghost btn-sm" type="button" title="Completar 12 meses para teste">
+                ✨ Demo 12M
+              </button>
+            </div>
+          </div>
+
+          <!-- Cards de Métricas Consolidadas dos 12 Meses -->
+          <div class="kpi-grid kpi-12m-grid">
+            <div class="kpi-card card-proventos">
+              <div class="kpi-icon">📈</div>
+              <div class="kpi-body">
+                <span class="kpi-label">Proventos (12M)</span>
+                <span id="kpi-12m-proventos" class="kpi-value font-mono">R$ 0,00</span>
+                <span id="kpi-12m-media-proventos" class="kpi-hint">Média: R$ 0,00/mês</span>
+              </div>
+            </div>
+
+            <div class="kpi-card card-adiantamento">
+              <div class="kpi-icon">🔄</div>
+              <div class="kpi-body">
+                <span class="kpi-label">Adiantamentos (12M)</span>
+                <span id="kpi-12m-adiantamento" class="kpi-value font-mono text-amber">R$ 0,00</span>
+                <span id="kpi-12m-pct-adiantamento" class="kpi-hint">0% dos proventos</span>
+              </div>
+            </div>
+
+            <div class="kpi-card card-liquido">
+              <div class="kpi-icon">💵</div>
+              <div class="kpi-body">
+                <span class="kpi-label">Líquido Depositado (12M)</span>
+                <span id="kpi-12m-liquido" class="kpi-value font-mono text-success">R$ 0,00</span>
+                <span id="kpi-12m-pct-liquido" class="kpi-hint">0% do valor bruto</span>
+              </div>
+            </div>
+
+            <div class="kpi-card card-pico">
+              <div class="kpi-icon">🏆</div>
+              <div class="kpi-body">
+                <span class="kpi-label">Picos da Folha</span>
+                <span id="kpi-12m-pico" class="kpi-value font-mono">--/----</span>
+                <span id="kpi-12m-minimo" class="kpi-hint">Menor: --/----</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Canvas do Gráfico Comparativo de 12 Meses -->
+          <div class="card chart-card chart-main-card">
+            <div class="chart-header">
+              <div class="chart-header-left">
+                <h4>Trajetória Comparativa Mensal</h4>
+                <span class="chart-subtitle">Proventos Brutos (Azul) vs Adiantamento Anterior (Âmbar) vs Total Líquido (Verde)</span>
+              </div>
+              <div class="chart-legend-custom">
+                <span class="legend-dot dot-prov"></span> Proventos
+                <span class="legend-dot dot-adv"></span> Adiantamento Anterior
+                <span class="legend-dot dot-liq"></span> Total Líquido
+              </div>
+            </div>
+            <div class="chart-wrapper chart-wrapper-large">
+              <canvas id="canvas-evolucao-12m"></canvas>
+            </div>
+          </div>
+
+          <!-- Tabela Comparativa Resumida Mês a Mês dos 12 Meses -->
+          <div class="card table-card table-12m-card">
+            <div class="table-12m-header">
+              <div>
+                <h4>Demonstrativo Analítico Mensal (12 Meses)</h4>
+                <p class="chart-subtitle">Resumo das competências com evolução mês a mês e variação percentual</p>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="report-table table-12m">
+                <thead>
+                  <tr>
+                    <th>Competência</th>
+                    <th>Empresa</th>
+                    <th class="text-right">Colaboradores</th>
+                    <th class="text-right">Proventos (R$)</th>
+                    <th class="text-right">Adiantamento (R$)</th>
+                    <th class="text-right">% Adiant.</th>
+                    <th class="text-right">Descontos (R$)</th>
+                    <th class="text-right">Total Líquido (R$)</th>
+                    <th class="text-center">Variação Líq. MoM</th>
+                    <th class="text-center">Ação</th>
+                  </tr>
+                </thead>
+                <tbody id="table-12m-body">
+                  <!-- Injetado via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Grupo 2: Gráficos do Período Selecionado -->
+        <div id="charts-periodo-view" class="charts-grid-view hidden">
           <div class="card chart-card">
             <div class="chart-header">
               <h4>Composição da Folha de Pagamento</h4>
@@ -312,24 +517,14 @@
           </div>
         </div>
 
-        <!-- Grupo 2: Gráficos de Evolução Histórica -->
-        <div id="charts-evolucao-view" class="charts-grid-view hidden">
-          <div class="card chart-card">
-            <div class="chart-header">
-              <h4>Evolução Financeira da Folha</h4>
-              <span class="chart-subtitle">Trajetória de Proventos, Descontos, Adiantamento e Líquido entre Competências</span>
-            </div>
-            <div class="chart-wrapper">
-              <canvas id="canvas-evolucao-financeira"></canvas>
-            </div>
-          </div>
-
-          <div class="card chart-card">
+        <!-- Grupo 3: Headcount e Média Salarial -->
+        <div id="charts-headcount-view" class="charts-grid-view hidden">
+          <div class="card chart-card chart-full-col">
             <div class="chart-header">
               <h4>Evolução de Colaboradores (Headcount) & Média Salarial</h4>
-              <span class="chart-subtitle">Variação da quantidade de funcionários e salário base médio</span>
+              <span class="chart-subtitle">Variação da quantidade de funcionários e salário base contratual médio ao longo do tempo</span>
             </div>
-            <div class="chart-wrapper">
+            <div class="chart-wrapper chart-wrapper-large">
               <canvas id="canvas-evolucao-headcount"></canvas>
             </div>
           </div>
