@@ -17,14 +17,18 @@ Sistema desenvolvido sob medida para **extração automatizada de dados de folha
    - Suporte a múltiplos períodos simultâneos com navegação instantânea em abas.
 
 3. **Dashboard & Relatórios Gerenciais**:
-   - **Indicadores Chave (KPIs)**: Total de Colaboradores, Soma de Salários Base, Total de Proventos, Total de Adiantamento Anterior e Total Líquido a Pagar.
-   - **Filtros Dinâmicos**: Busca por nome/código, filtro específico para colaboradores com/sem adiantamento anterior, e ordenação multicritério.
-   - **Visualizações Gráficas**: Composição financeira (Doughnut) e Ranking dos Maiores Proventos e Líquidos (Barras Horizontais).
+   - **Indicadores Chave (6 KPIs)**: Total de Colaboradores, Soma de Salários Base, Total de Proventos, Total de Adiantamento Anterior, Total de Descontos e Total Líquido a Pagar.
+   - **Filtros Dinâmicos**: Busca por nome/código, filtro específico com/sem adiantamento anterior, e ordenação multicritério (incluindo por Descontos).
+   - **Tabela Estruturada & Sticky Header**: Cabeçalho fixo durante a rolagem, remoção de redundância da coluna período e alinhamento contábil (`Proventos - Adiantamento - Descontos = Líquido`).
+   - **Espelho de Holerite Individual (Modal)**: Visualização detalhada do contracheque de cada colaborador com 1 clique e botão para emissão de **Recibo Individual**.
+   - **Visualizações Gráficas com Abas**:
+     - *Análise do Período Atual*: Composição financeira (Doughnut) e Ranking dos Maiores Proventos/Líquidos (Barras Horizontais).
+     - *Evolução Histórica Multiperíodos*: Trajetória financeira cronológica (Proventos, Descontos, Adiantamento e Líquido) e evolução do quadro de colaboradores (Headcount) com média salarial.
 
-4. **Exportação & Impressão**:
-   - **Excel (.xlsx)**: Gera planilha Excel formatada com colunas ajustadas e totais.
+4. **Exportação & Impressão Corporativa**:
+   - **Excel (.xlsx)**: Gera planilha Excel formatada com colunas ajustadas e totais consolidados.
    - **CSV**: Download direto em UTF-8 com BOM compatível com Excel.
-   - **Impressão / PDF**: Layout A4 estilizado para relatórios físicos ou geração de PDF oficial.
+   - **Impressão / PDF A4 Otimizada**: Cabeçalho de impressão com dados corporativos, repetição de `<thead>` entre páginas, quebra limpa de linhas sem cortar colaboradores ao meio, rodapé com data/hora e campos de assinatura para RH e Contabilidade.
 
 ---
 

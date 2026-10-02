@@ -12,8 +12,12 @@ const state = {
   adiantamentoFilter: "all",
   sortBy: "nome_asc",
   showCharts: false,
+  activeChartTab: "periodo", // "periodo" ou "evolucao"
   chartComposicao: null,
-  chartTopSalarios: null
+  chartTopSalarios: null,
+  chartEvolucaoFin: null,
+  chartEvolucaoHeadcount: null,
+  currentModalEmployee: null
 };
 
 // Elementos DOM
@@ -40,6 +44,11 @@ const dom = {
   btnToggleCharts: document.getElementById("btn-toggle-charts"),
   chartToggleText: document.getElementById("chart-toggle-text"),
   chartsPanel: document.getElementById("charts-panel"),
+  tabChartPeriodo: document.getElementById("tab-chart-periodo"),
+  tabChartEvolucao: document.getElementById("tab-chart-evolucao"),
+  chartsPeriodoView: document.getElementById("charts-periodo-view"),
+  chartsEvolucaoView: document.getElementById("charts-evolucao-view"),
+
   btnExportExcel: document.getElementById("btn-export-excel"),
   btnExportCsv: document.getElementById("btn-export-csv"),
   btnPrint: document.getElementById("btn-print"),
@@ -49,6 +58,7 @@ const dom = {
   kpiSalarios: document.getElementById("kpi-salarios"),
   kpiProventos: document.getElementById("kpi-proventos"),
   kpiAdiantamento: document.getElementById("kpi-adiantamento"),
+  kpiDescontos: document.getElementById("kpi-descontos"),
   kpiLiquido: document.getElementById("kpi-liquido"),
   
   searchInput: document.getElementById("search-input"),
@@ -64,10 +74,29 @@ const dom = {
   footSalario: document.getElementById("foot-salario"),
   footProventos: document.getElementById("foot-proventos"),
   footAdiantamento: document.getElementById("foot-adiantamento"),
+  footDescontos: document.getElementById("foot-descontos"),
   footLiquido: document.getElementById("foot-liquido"),
 
+  modalHolerite: document.getElementById("modal-holerite"),
+  btnCloseModal: document.getElementById("btn-close-modal"),
+  btnCloseModalBottom: document.getElementById("btn-close-modal-bottom"),
+  btnPrintHolerite: document.getElementById("btn-print-holerite"),
+  modalCompBadge: document.getElementById("modal-comp-badge"),
+  modalEmpresaNome: document.getElementById("modal-empresa-nome"),
+  modalEmpresaCnpj: document.getElementById("modal-empresa-cnpj"),
+  modalEmpNome: document.getElementById("modal-emp-nome"),
+  modalEmpCodigo: document.getElementById("modal-emp-codigo"),
+  modalEmpFuncao: document.getElementById("modal-emp-funcao"),
+  modalEmpPeriodo: document.getElementById("modal-emp-periodo"),
+  modalSalario: document.getElementById("modal-salario"),
+  modalProventos: document.getElementById("modal-proventos"),
+  modalAdiantamento: document.getElementById("modal-adiantamento"),
+  modalDescontos: document.getElementById("modal-descontos"),
+  modalLiquido: document.getElementById("modal-liquido"),
+
   printEmpresaInfo: document.getElementById("print-empresa-info"),
-  printPeriodoInfo: document.getElementById("print-periodo-info")
+  printPeriodoInfo: document.getElementById("print-periodo-info"),
+  printTimestamp: document.getElementById("print-timestamp")
 };
 
 // Formatação Monetária Brasileira
@@ -187,6 +216,44 @@ function setupEventListeners() {
     if (state.showCharts) renderCharts();
   });
 
+  // Abas de Gráficos (Período vs Evolução)
+  if (dom.tabChartPeriodo && dom.tabChartEvolucao) {
+    dom.tabChartPeriodo.addEventListener("click", () => {
+      state.activeChartTab = "periodo";
+      dom.tabChartPeriodo.classList.add("active");
+      dom.tabChartEvolucao.classList.remove("active");
+      dom.chartsPeriodoView.classList.remove("hidden");
+      dom.chartsEvolucaoView.classList.add("hidden");
+      renderCharts();
+    });
+
+    dom.tabChartEvolucao.addEventListener("click", () => {
+      state.activeChartTab = "evolucao";
+      dom.tabChartEvolucao.classList.add("active");
+      dom.tabChartPeriodo.classList.remove("active");
+      dom.chartsEvolucaoView.classList.remove("hidden");
+      dom.chartsPeriodoView.classList.add("hidden");
+      renderCharts();
+    });
+  }
+
+  // Modal de Holerite Individual
+  if (dom.btnCloseModal) dom.btnCloseModal.addEventListener("click", closeHoleriteModal);
+  if (dom.btnCloseModalBottom) dom.btnCloseModalBottom.addEventListener("click", closeHoleriteModal);
+  if (dom.modalHolerite) {
+    dom.modalHolerite.addEventListener("click", (e) => {
+      if (e.target === dom.modalHolerite) closeHoleriteModal();
+    });
+  }
+  if (dom.btnPrintHolerite) dom.btnPrintHolerite.addEventListener("click", printHoleriteIndividual);
+
+  // Tecla ESC para fechar modal
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && dom.modalHolerite && !dom.modalHolerite.classList.contains("hidden")) {
+      closeHoleriteModal();
+    }
+  });
+
   // Exportações
   dom.btnExportExcel.addEventListener("click", exportToExcel);
   dom.btnExportCsv.addEventListener("click", () => {
@@ -196,6 +263,9 @@ function setupEventListeners() {
   });
 
   dom.btnPrint.addEventListener("click", () => {
+    if (dom.printTimestamp) {
+      dom.printTimestamp.textContent = `Emissão: ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}`;
+    }
     window.print();
   });
 
@@ -289,6 +359,7 @@ function updateViewWithRelatorio(rel) {
   dom.kpiSalarios.textContent = formatBRL(rel.total_salario);
   dom.kpiProventos.textContent = formatBRL(rel.total_proventos);
   dom.kpiAdiantamento.textContent = formatBRL(rel.total_adiantamento);
+  if (dom.kpiDescontos) dom.kpiDescontos.textContent = formatBRL(rel.total_descontos);
   dom.kpiLiquido.textContent = formatBRL(rel.total_liquido);
 
   renderTable();
@@ -333,6 +404,8 @@ function getFilteredAndSortedItems() {
         return b.proventos - a.proventos;
       case "adiantamento_desc":
         return b.adiantamento_anterior - a.adiantamento_anterior;
+      case "descontos_desc":
+        return b.descontos - a.descontos;
       case "salario_desc":
         return b.salario - a.salario;
       default:
@@ -359,6 +432,7 @@ function renderTable() {
     dom.footSalario.textContent = "R$ 0,00";
     dom.footProventos.textContent = "R$ 0,00";
     dom.footAdiantamento.textContent = "R$ 0,00";
+    if (dom.footDescontos) dom.footDescontos.textContent = "R$ 0,00";
     dom.footLiquido.textContent = "R$ 0,00";
     return;
   }
@@ -368,19 +442,20 @@ function renderTable() {
   let sumSalario = 0;
   let sumProventos = 0;
   let sumAdiantamento = 0;
+  let sumDescontos = 0;
   let sumLiquido = 0;
-
-  const periodoTexto = state.currentRelatorio.periodo_texto || "";
 
   items.forEach(emp => {
     sumSalario += emp.salario;
     sumProventos += emp.proventos;
     sumAdiantamento += emp.adiantamento_anterior;
+    sumDescontos += emp.descontos;
     sumLiquido += emp.liquido;
 
     const tr = document.createElement("tr");
+    tr.className = "row-clickable";
+    tr.title = "Clique para abrir o holerite detalhado";
     tr.innerHTML = `
-      <td class="col-periodo">${periodoTexto}</td>
       <td class="col-nome">
         <div class="emp-name-line">
           ${emp.codigo ? `<span class="badge-code">Cód ${emp.codigo}</span>` : ""}
@@ -395,8 +470,16 @@ function renderTable() {
           ? `<span class="badge-adiantamento">${formatBRL(emp.adiantamento_anterior)}</span>` 
           : `<span class="text-muted">R$ 0,00</span>`}
       </td>
+      <td class="col-num text-right font-mono text-danger font-semibold">${formatBRL(emp.descontos)}</td>
       <td class="col-num text-right font-mono text-bold text-success">${formatBRL(emp.liquido)}</td>
+      <td class="col-actions">
+        <button class="btn-action-view" type="button" title="Ver Holerite Individual">
+          📄 Recibo
+        </button>
+      </td>
     `;
+
+    tr.addEventListener("click", () => openHoleriteModal(emp));
     dom.tableBody.appendChild(tr);
   });
 
@@ -405,6 +488,7 @@ function renderTable() {
   dom.footSalario.textContent = formatBRL(sumSalario);
   dom.footProventos.textContent = formatBRL(sumProventos);
   dom.footAdiantamento.textContent = formatBRL(sumAdiantamento);
+  if (dom.footDescontos) dom.footDescontos.textContent = formatBRL(sumDescontos);
   dom.footLiquido.textContent = formatBRL(sumLiquido);
 }
 
@@ -538,114 +622,454 @@ function exportToExcel() {
   showToast("Planilha Excel gerada com sucesso!", "success");
 }
 
-// Renderização dos Gráficos com Chart.js
-function renderCharts() {
-  if (!state.currentRelatorio || typeof Chart === "undefined") return;
+// Funções do Modal de Holerite Individual
+function openHoleriteModal(emp) {
+  state.currentModalEmployee = emp;
+  const rel = state.currentRelatorio || {};
 
-  const rel = state.currentRelatorio;
-  const isDark = document.body.classList.contains("theme-dark");
-  const textColor = isDark ? "#94a3b8" : "#475569";
+  dom.modalCompBadge.textContent = rel.mes_ano || "--/----";
+  dom.modalEmpresaNome.textContent = rel.empresa || "EMPRESA";
+  dom.modalEmpresaCnpj.textContent = `CNPJ: ${rel.cnpj || "Não informado"}`;
 
-  // 1. Gráfico de Composição Financeira (Doughnut)
-  const ctxComp = document.getElementById("canvas-composicao");
-  if (ctxComp) {
-    if (state.chartComposicao) state.chartComposicao.destroy();
-    
-    state.chartComposicao = new Chart(ctxComp, {
-      type: "doughnut",
-      data: {
-        labels: ["Total Líquido", "Adiantamento Anterior", "Outros Descontos"],
-        datasets: [{
-          data: [
-            rel.total_liquido,
-            rel.total_adiantamento,
-            Math.max(0, rel.total_descontos - rel.total_adiantamento)
-          ],
-          backgroundColor: [
-            "#10b981", // Verde liquido
-            "#f59e0b", // Ambar adiantamento
-            "#ef4444"  // Vermelho descontos
-          ],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: "bottom",
-            labels: { color: textColor, font: { family: "Plus Jakarta Sans", size: 12 } }
-          },
-          tooltip: {
-            callbacks: {
-              label: (context) => ` ${context.label}: ${formatBRL(context.raw)}`
-            }
-          }
-        },
-        cutout: "68%"
-      }
-    });
+  dom.modalEmpNome.textContent = emp.nome;
+  dom.modalEmpCodigo.textContent = emp.codigo ? `Cód: ${emp.codigo}` : "Cód: Não informado";
+  dom.modalEmpFuncao.textContent = emp.funcao ? `Cargo: ${emp.funcao}` : "Cargo: Não informado";
+  dom.modalEmpPeriodo.textContent = `Período de: ${rel.periodo_texto || "--"}`;
+
+  dom.modalSalario.textContent = formatBRL(emp.salario);
+  dom.modalProventos.textContent = formatBRL(emp.proventos);
+  dom.modalAdiantamento.textContent = formatBRL(emp.adiantamento_anterior);
+  dom.modalDescontos.textContent = formatBRL(emp.descontos);
+  dom.modalLiquido.textContent = formatBRL(emp.liquido);
+
+  dom.modalHolerite.classList.remove("hidden");
+}
+
+function closeHoleriteModal() {
+  dom.modalHolerite.classList.add("hidden");
+  state.currentModalEmployee = null;
+}
+
+function printHoleriteIndividual() {
+  if (!state.currentModalEmployee) return;
+  const emp = state.currentModalEmployee;
+  const rel = state.currentRelatorio || {};
+
+  const printWindow = window.open("", "_blank", "width=850,height=750");
+  if (!printWindow) {
+    showToast("Permita pop-ups no navegador para imprimir o recibo individual", "error");
+    return;
   }
 
-  // 2. Gráfico dos Maiores Proventos (Horizontal Bar)
-  const ctxTop = document.getElementById("canvas-top-salarios");
-  if (ctxTop) {
-    if (state.chartTopSalarios) state.chartTopSalarios.destroy();
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Recibo de Pagamento - ${emp.nome}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 30px; color: #111; font-size: 13px; line-height: 1.5; }
+        .receipt-card { border: 2px solid #222; padding: 24px; max-width: 650px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #222; padding-bottom: 12px; margin-bottom: 16px; }
+        .company h2 { margin: 0 0 4px 0; font-size: 17px; }
+        .company p { margin: 0; font-size: 11px; color: #555; }
+        .comp { text-align: right; font-weight: bold; font-size: 13px; }
+        .emp-box { background: #f5f5f5; border: 1px solid #ddd; padding: 12px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .val-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+        .val-table th, .val-table td { padding: 10px 12px; border-bottom: 1px solid #ddd; text-align: left; }
+        .val-table th { background: #f0f0f0; }
+        .text-right { text-align: right; }
+        .font-mono { font-family: monospace; font-size: 13px; }
+        .total-row { background: #e8f5e9; font-weight: bold; font-size: 14px; }
+        .total-row td { border-top: 2px solid #2e7d32; border-bottom: 2px solid #2e7d32; color: #1b5e20; }
+        .signatures { margin-top: 50px; display: flex; justify-content: space-between; gap: 40px; }
+        .sig-box { flex: 1; text-align: center; }
+        .sig-line { border-top: 1px solid #000; margin-bottom: 6px; }
+        .sig-box p { margin: 0; font-size: 10px; }
+        .footer-note { margin-top: 24px; font-size: 10px; color: #777; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="receipt-card">
+        <div class="header">
+          <div class="company">
+            <h2>${rel.empresa || "EMPRESA"}</h2>
+            <p>CNPJ: ${rel.cnpj || "Não informado"}</p>
+          </div>
+          <div class="comp">
+            RECIBO DE PAGAMENTO<br>
+            Competência: ${rel.mes_ano || "--/----"}
+          </div>
+        </div>
 
-    const top5 = [...rel.itens].sort((a, b) => b.proventos - a.proventos).slice(0, 5);
-    const labels = top5.map(e => e.nome.length > 20 ? e.nome.slice(0, 20) + "..." : e.nome);
-    const dataProv = top5.map(e => e.proventos);
-    const dataLiq = top5.map(e => e.liquido);
+        <div class="emp-box">
+          <div><strong>Colaborador:</strong> ${emp.nome}</div>
+          <div><strong>Código:</strong> ${emp.codigo || "-"}</div>
+          <div><strong>Cargo/Função:</strong> ${emp.funcao || "-"}</div>
+          <div><strong>Período:</strong> ${rel.periodo_texto || "-"}</div>
+        </div>
 
-    state.chartTopSalarios = new Chart(ctxTop, {
-      type: "bar",
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            label: "Proventos",
-            data: dataProv,
-            backgroundColor: "#3b82f6",
-            borderRadius: 4
-          },
-          {
-            label: "Total Líquido",
-            data: dataLiq,
-            backgroundColor: "#10b981",
-            borderRadius: 4
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        indexAxis: "y",
-        scales: {
-          x: {
-            ticks: { color: textColor, callback: (v) => "R$ " + (v/1000).toFixed(0) + "k" },
-            grid: { color: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)" }
-          },
-          y: {
-            ticks: { color: textColor },
-            grid: { display: false }
-          }
+        <table class="val-table">
+          <thead>
+            <tr>
+              <th>Descrição</th>
+              <th class="text-right">Valor (R$)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Salário Base Contratual</td>
+              <td class="text-right font-mono">${formatBRL(emp.salario)}</td>
+            </tr>
+            <tr>
+              <td>Total de Proventos (Bruto)</td>
+              <td class="text-right font-mono">${formatBRL(emp.proventos)}</td>
+            </tr>
+            <tr>
+              <td>(-) Adiantamento Anterior Compensado</td>
+              <td class="text-right font-mono">${formatBRL(emp.adiantamento_anterior)}</td>
+            </tr>
+            <tr>
+              <td>(-) Total de Descontos e Retenções</td>
+              <td class="text-right font-mono">${formatBRL(emp.descontos)}</td>
+            </tr>
+            <tr class="total-row">
+              <td>VALOR LÍQUIDO CREDITADO</td>
+              <td class="text-right font-mono">${formatBRL(emp.liquido)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="signatures">
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <p>EMPREGADOR / RH</p>
+          </div>
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <p>${emp.nome}<br>Assinatura do Colaborador</p>
+          </div>
+        </div>
+
+        <div class="footer-note">
+          Emitido em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")} - HoleriteManager
+        </div>
+      </div>
+      <script>
+        window.onload = function() {
+          window.print();
+        };
+      <\/script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+// Ordenação cronológica de competências (MM/AAAA)
+function parseMesAnoKey(mesAnoStr) {
+  if (!mesAnoStr) return 0;
+  const parts = mesAnoStr.split("/");
+  if (parts.length === 2) {
+    const mm = parseInt(parts[0], 10);
+    const yyyy = parseInt(parts[1], 10);
+    return yyyy * 100 + mm;
+  }
+  return 0;
+}
+
+// Renderização dos Gráficos com Chart.js
+function renderCharts() {
+  if (typeof Chart === "undefined") return;
+
+  const isDark = document.body.classList.contains("theme-dark");
+  const textColor = isDark ? "#94a3b8" : "#475569";
+  const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+
+  if (state.activeChartTab === "periodo") {
+    if (!state.currentRelatorio) return;
+    const rel = state.currentRelatorio;
+
+    // 1. Gráfico de Composição Financeira (Doughnut)
+    const ctxComp = document.getElementById("canvas-composicao");
+    if (ctxComp) {
+      if (state.chartComposicao) state.chartComposicao.destroy();
+      
+      const outrosDescontos = Math.max(0, rel.total_descontos - rel.total_adiantamento);
+      state.chartComposicao = new Chart(ctxComp, {
+        type: "doughnut",
+        data: {
+          labels: ["Total Líquido", "Adiantamento Anterior", "Outros Descontos"],
+          datasets: [{
+            data: [
+              rel.total_liquido,
+              rel.total_adiantamento,
+              outrosDescontos
+            ],
+            backgroundColor: [
+              "#10b981", // Verde liquido
+              "#f59e0b", // Ambar adiantamento
+              "#ef4444"  // Vermelho descontos
+            ],
+            borderWidth: 0
+          }]
         },
-        plugins: {
-          legend: {
-            position: "bottom",
-            labels: { color: textColor, font: { family: "Plus Jakarta Sans", size: 12 } }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { color: textColor, font: { family: "Plus Jakarta Sans", size: 12 } }
+            },
+            tooltip: {
+              callbacks: {
+                label: (context) => ` ${context.label}: ${formatBRL(context.raw)}`
+              }
+            }
           },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` ${ctx.dataset.label}: ${formatBRL(ctx.raw)}`
+          cutout: "68%"
+        }
+      });
+    }
+
+    // 2. Gráfico dos Maiores Proventos (Horizontal Bar)
+    const ctxTop = document.getElementById("canvas-top-salarios");
+    if (ctxTop) {
+      if (state.chartTopSalarios) state.chartTopSalarios.destroy();
+
+      const top5 = [...rel.itens].sort((a, b) => b.proventos - a.proventos).slice(0, 5);
+      const labels = top5.map(e => e.nome.length > 20 ? e.nome.slice(0, 20) + "..." : e.nome);
+      const dataProv = top5.map(e => e.proventos);
+      const dataLiq = top5.map(e => e.liquido);
+
+      state.chartTopSalarios = new Chart(ctxTop, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Proventos",
+              data: dataProv,
+              backgroundColor: "#3b82f6",
+              borderRadius: 4
+            },
+            {
+              label: "Total Líquido",
+              data: dataLiq,
+              backgroundColor: "#10b981",
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          indexAxis: "y",
+          scales: {
+            x: {
+              ticks: { color: textColor, callback: (v) => "R$ " + (v/1000).toFixed(0) + "k" },
+              grid: { color: gridColor }
+            },
+            y: {
+              ticks: { color: textColor },
+              grid: { display: false }
+            }
+          },
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { color: textColor, font: { family: "Plus Jakarta Sans", size: 12 } }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ${formatBRL(ctx.raw)}`
+              }
             }
           }
         }
-      }
-    });
+      });
+    }
+  } else if (state.activeChartTab === "evolucao") {
+    // 3. Gráficos de Evolução Histórica Multiperíodos
+    if (!state.periodos || state.periodos.length === 0) return;
+
+    // Ordenar períodos cronologicamente (ex: 03/2026 -> 04/2026 -> 05/2026 -> ...)
+    const sortedPeriodos = [...state.periodos].sort((a, b) => parseMesAnoKey(a.mes_ano) - parseMesAnoKey(b.mes_ano));
+
+    const labels = sortedPeriodos.map(p => p.mes_ano || p.periodo_texto);
+    const dataProventos = sortedPeriodos.map(p => p.total_proventos);
+    const dataLiquido = sortedPeriodos.map(p => p.total_liquido);
+    const dataDescontos = sortedPeriodos.map(p => p.total_descontos);
+    const dataAdiantamento = sortedPeriodos.map(p => p.total_adiantamento);
+
+    // Gráfico de Evolução Financeira
+    const ctxEvolucaoFin = document.getElementById("canvas-evolucao-financeira");
+    if (ctxEvolucaoFin) {
+      if (state.chartEvolucaoFin) state.chartEvolucaoFin.destroy();
+
+      state.chartEvolucaoFin = new Chart(ctxEvolucaoFin, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Proventos Brutos",
+              data: dataProventos,
+              borderColor: "#3b82f6",
+              backgroundColor: "rgba(59, 130, 246, 0.1)",
+              borderWidth: 2.5,
+              tension: 0.3,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              fill: false
+            },
+            {
+              label: "Total Líquido",
+              data: dataLiquido,
+              borderColor: "#10b981",
+              backgroundColor: "rgba(16, 185, 129, 0.1)",
+              borderWidth: 2.5,
+              tension: 0.3,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              fill: false
+            },
+            {
+              label: "Total Descontos",
+              data: dataDescontos,
+              borderColor: "#ef4444",
+              backgroundColor: "rgba(239, 68, 68, 0.1)",
+              borderWidth: 2,
+              borderDash: [5, 5],
+              tension: 0.3,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              fill: false
+            },
+            {
+              label: "Adiantamento Anterior",
+              data: dataAdiantamento,
+              borderColor: "#f59e0b",
+              backgroundColor: "rgba(245, 158, 11, 0.1)",
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              ticks: { color: textColor },
+              grid: { color: gridColor }
+            },
+            y: {
+              ticks: { color: textColor, callback: (v) => "R$ " + (v/1000).toFixed(0) + "k" },
+              grid: { color: gridColor }
+            }
+          },
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { color: textColor, font: { family: "Plus Jakarta Sans", size: 11 } }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.dataset.label}: ${formatBRL(ctx.raw)}`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Gráfico de Evolução de Colaboradores e Média Salarial
+    const ctxEvolucaoHeadcount = document.getElementById("canvas-evolucao-headcount");
+    if (ctxEvolucaoHeadcount) {
+      if (state.chartEvolucaoHeadcount) state.chartEvolucaoHeadcount.destroy();
+
+      const dataHeadcount = sortedPeriodos.map(p => p.total_funcionarios);
+      const dataMediaSalarial = sortedPeriodos.map(p => p.total_funcionarios > 0 ? (p.total_salario / p.total_funcionarios) : 0);
+
+      state.chartEvolucaoHeadcount = new Chart(ctxEvolucaoHeadcount, {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              type: "bar",
+              label: "Nº de Colaboradores",
+              data: dataHeadcount,
+              backgroundColor: isDark ? "rgba(99, 102, 241, 0.6)" : "rgba(79, 70, 229, 0.65)",
+              borderRadius: 4,
+              yAxisID: "y"
+            },
+            {
+              type: "line",
+              label: "Salário Base Médio",
+              data: dataMediaSalarial,
+              borderColor: "#f59e0b",
+              backgroundColor: "#f59e0b",
+              borderWidth: 2.5,
+              tension: 0.3,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              yAxisID: "y1"
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              ticks: { color: textColor },
+              grid: { color: gridColor }
+            },
+            y: {
+              type: "linear",
+              display: true,
+              position: "left",
+              ticks: { color: textColor, stepSize: 1 },
+              grid: { color: gridColor },
+              title: { display: true, text: "Colaboradores", color: textColor, font: { size: 10 } }
+            },
+            y1: {
+              type: "linear",
+              display: true,
+              position: "right",
+              ticks: { color: textColor, callback: (v) => "R$ " + (v/1000).toFixed(1) + "k" },
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: "Média Salarial (R$)", color: textColor, font: { size: 10 } }
+            }
+          },
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { color: textColor, font: { family: "Plus Jakarta Sans", size: 11 } }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  if (ctx.dataset.yAxisID === "y1") {
+                    return ` ${ctx.dataset.label}: ${formatBRL(ctx.raw)}`;
+                  }
+                  return ` ${ctx.dataset.label}: ${ctx.raw} pessoas`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
   }
 }
 
 // Iniciar ao carregar a página
 document.addEventListener("DOMContentLoaded", initApp);
+

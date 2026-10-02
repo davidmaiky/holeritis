@@ -208,6 +208,15 @@
           </div>
         </div>
 
+        <div class="kpi-card card-descontos">
+          <div class="kpi-icon">📉</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Total Descontos</span>
+            <span id="kpi-descontos" class="kpi-value font-mono text-danger">R$ 0,00</span>
+            <span class="kpi-hint">Deduções e retenções</span>
+          </div>
+        </div>
+
         <div class="kpi-card card-liquido">
           <div class="kpi-icon">💵</div>
           <div class="kpi-body">
@@ -220,23 +229,59 @@
 
       <!-- Painel de Gráficos (Ocultável) -->
       <section id="charts-panel" class="charts-section hidden">
-        <div class="card chart-card">
-          <div class="chart-header">
-            <h4>Composição da Folha de Pagamento</h4>
-            <span class="chart-subtitle">Proventos vs Adiantamento Anterior vs Descontos vs Líquido</span>
+        <!-- Barra de Abas de Gráficos -->
+        <div class="chart-tab-bar">
+          <button id="tab-chart-periodo" class="chart-tab-btn active" type="button">
+            📊 Análise do Período Atual
+          </button>
+          <button id="tab-chart-evolucao" class="chart-tab-btn" type="button">
+            📈 Evolução Histórica (Todos os Meses)
+          </button>
+        </div>
+
+        <!-- Grupo 1: Gráficos do Período Selecionado -->
+        <div id="charts-periodo-view" class="charts-grid-view">
+          <div class="card chart-card">
+            <div class="chart-header">
+              <h4>Composição da Folha de Pagamento</h4>
+              <span class="chart-subtitle">Proventos vs Adiantamento Anterior vs Outros Descontos vs Líquido</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="canvas-composicao"></canvas>
+            </div>
           </div>
-          <div class="chart-wrapper">
-            <canvas id="canvas-composicao"></canvas>
+
+          <div class="card chart-card">
+            <div class="chart-header">
+              <h4>Maiores Remunerações no Período</h4>
+              <span class="chart-subtitle">Comparativo Proventos x Líquido por Colaborador</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="canvas-top-salarios"></canvas>
+            </div>
           </div>
         </div>
 
-        <div class="card chart-card">
-          <div class="chart-header">
-            <h4>Maiores Remunerações no Período</h4>
-            <span class="chart-subtitle">Comparativo Proventos x Líquido</span>
+        <!-- Grupo 2: Gráficos de Evolução Histórica -->
+        <div id="charts-evolucao-view" class="charts-grid-view hidden">
+          <div class="card chart-card">
+            <div class="chart-header">
+              <h4>Evolução Financeira da Folha</h4>
+              <span class="chart-subtitle">Trajetória de Proventos, Descontos, Adiantamento e Líquido entre Competências</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="canvas-evolucao-financeira"></canvas>
+            </div>
           </div>
-          <div class="chart-wrapper">
-            <canvas id="canvas-top-salarios"></canvas>
+
+          <div class="card chart-card">
+            <div class="chart-header">
+              <h4>Evolução de Colaboradores (Headcount) & Média Salarial</h4>
+              <span class="chart-subtitle">Variação da quantidade de funcionários e salário base médio</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="canvas-evolucao-headcount"></canvas>
+            </div>
           </div>
         </div>
       </section>
@@ -272,6 +317,7 @@
               <option value="liquido_desc">Maior Líquido</option>
               <option value="proventos_desc">Maior Provento</option>
               <option value="adiantamento_desc">Maior Adiantamento</option>
+              <option value="descontos_desc">Maior Desconto</option>
               <option value="salario_desc">Maior Salário Base</option>
             </select>
           </div>
@@ -281,17 +327,18 @@
           </div>
         </div>
 
-        <!-- Tabela Estruturada -->
+        <!-- Tabela Estruturada com Cabeçalho Fixo -->
         <div class="table-responsive">
           <table class="report-table" id="report-table">
             <thead>
               <tr>
-                <th class="col-periodo">Período</th>
-                <th class="col-nome">Colaborador / Função</th>
-                <th class="col-num text-right">Salário</th>
+                <th class="col-nome">Colaborador / Cargo</th>
+                <th class="col-num text-right">Salário Base</th>
                 <th class="col-num text-right">Proventos</th>
                 <th class="col-num text-right">Adiantamento Anterior</th>
+                <th class="col-num text-right">Descontos</th>
                 <th class="col-num text-right">Total Líquido</th>
+                <th class="col-actions text-center">Recibo</th>
               </tr>
             </thead>
             <tbody id="table-body">
@@ -299,11 +346,13 @@
             </tbody>
             <tfoot id="table-foot">
               <tr class="summary-row">
-                <td colspan="2" class="text-bold">TOTAIS CONSOLIDADOS (<span id="foot-count">0</span> colaboradores)</td>
+                <td class="text-bold">TOTAIS CONSOLIDADOS (<span id="foot-count">0</span> colaboradores)</td>
                 <td id="foot-salario" class="col-num text-right font-mono text-bold">R$ 0,00</td>
                 <td id="foot-proventos" class="col-num text-right font-mono text-bold">R$ 0,00</td>
                 <td id="foot-adiantamento" class="col-num text-right font-mono text-bold text-amber">R$ 0,00</td>
+                <td id="foot-descontos" class="col-num text-right font-mono text-bold text-danger">R$ 0,00</td>
                 <td id="foot-liquido" class="col-num text-right font-mono text-bold text-success">R$ 0,00</td>
+                <td></td>
               </tr>
             </tfoot>
           </table>
@@ -326,12 +375,108 @@
 
   </main>
 
+  <!-- Modal de Detalhes / Espelho de Holerite Individual -->
+  <div id="modal-holerite" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-card holerite-modal-card">
+      <div class="modal-header">
+        <div class="holerite-header-brand">
+          <div class="holerite-badge-group">
+            <span class="badge badge-competencia" id="modal-comp-badge">--/----</span>
+            <span class="badge badge-info">Espelho de Holerite</span>
+          </div>
+          <h3 id="modal-empresa-nome">EMPRESA</h3>
+          <p id="modal-empresa-cnpj" class="modal-empresa-cnpj">CNPJ: --</p>
+        </div>
+        <button id="btn-close-modal" class="btn-close" aria-label="Fechar">&times;</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="holerite-employee-card">
+          <div class="emp-avatar-placeholder">👤</div>
+          <div class="emp-card-details">
+            <h4 id="modal-emp-nome">NOME DO COLABORADOR</h4>
+            <div class="emp-meta-tags">
+              <span id="modal-emp-codigo" class="meta-tag">Cód: --</span>
+              <span id="modal-emp-funcao" class="meta-tag">Cargo: --</span>
+            </div>
+            <p id="modal-emp-periodo" class="emp-period-range">Período de: -- a --</p>
+          </div>
+        </div>
+
+        <div class="holerite-breakdown">
+          <div class="breakdown-item">
+            <span class="breakdown-label">Salário Base Contratual</span>
+            <span id="modal-salario" class="breakdown-val font-mono">R$ 0,00</span>
+          </div>
+          <div class="breakdown-item bg-highlight-prov">
+            <div class="breakdown-label-wrap">
+              <span class="breakdown-label text-bold">Total de Proventos (Bruto)</span>
+              <span class="breakdown-hint">Remuneração total do período</span>
+            </div>
+            <span id="modal-proventos" class="breakdown-val font-mono text-primary text-bold">R$ 0,00</span>
+          </div>
+          <div class="breakdown-item bg-highlight-adv">
+            <div class="breakdown-label-wrap">
+              <span class="breakdown-label">(-) Adiantamento Anterior</span>
+              <span class="breakdown-hint">Compensação de antecipação</span>
+            </div>
+            <span id="modal-adiantamento" class="breakdown-val font-mono text-amber text-bold">R$ 0,00</span>
+          </div>
+          <div class="breakdown-item bg-highlight-desc">
+            <div class="breakdown-label-wrap">
+              <span class="breakdown-label">(-) Total de Descontos</span>
+              <span class="breakdown-hint">INSS, IRRF e outras retenções</span>
+            </div>
+            <span id="modal-descontos" class="breakdown-val font-mono text-danger text-bold">R$ 0,00</span>
+          </div>
+          <div class="breakdown-item bg-highlight-liq total-item">
+            <div class="breakdown-label-wrap">
+              <span class="breakdown-label text-bold">VALOR LÍQUIDO A RECEBER</span>
+              <span class="breakdown-hint">Valor efetivo creditado ao funcionário</span>
+            </div>
+            <span id="modal-liquido" class="breakdown-val font-mono text-success text-bold total-val">R$ 0,00</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-print-holerite" class="btn btn-secondary" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Imprimir Recibo Individual
+        </button>
+        <button id="btn-close-modal-bottom" class="btn btn-primary" type="button">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Cabeçalho Exclusivo de Impressão -->
   <div id="print-header" class="print-only">
     <div class="print-brand">
       <h2>RELATÓRIO DE FOLHA DE PAGAMENTO & HOLERITES</h2>
       <p id="print-empresa-info">PRIME PRO EXTREME COSMETICOS INC LTDA</p>
       <p id="print-periodo-info">Período de: 01/08/2026 a 31/08/2026</p>
+    </div>
+  </div>
+
+  <!-- Rodapé Exclusivo de Impressão -->
+  <div id="print-footer" class="print-only">
+    <div class="print-signatures">
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <p>Departamento Pessoal / RH</p>
+      </div>
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <p>Conferência Contábil / Financeiro</p>
+      </div>
+    </div>
+    <div class="print-meta">
+      <span id="print-timestamp"></span>
+      <span>HoleriteManager - Sistema de Relatórios Contábeis</span>
     </div>
   </div>
 
