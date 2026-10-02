@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Relatórios de Folha de Pagamento & Holerites</title>
+  
+  <!-- Fontes Google -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Biblioteca SheetJS para exportação Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js para visualizações gráficas -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-dark">
+  <!-- Notificações Toast -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Topbar Corporativa -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="10" y1="9" x2="8" y2="9"></line>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Holerite<span>Manager</span></h1>
+          <p class="brand-subtitle">Gestão & Inteligência de Folhas de Pagamento</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-toggle-theme" class="btn btn-ghost" title="Alternar tema claro/escuro">
+          <span class="theme-icon light-icon">☀️</span>
+          <span class="theme-icon dark-icon">🌙</span>
+        </button>
+        <button id="btn-open-upload" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          Importar Novo PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container Principal -->
+  <main class="main-content">
+    
+    <!-- Modal / Seção de Upload de Arquivo -->
+    <section id="upload-panel" class="upload-panel hidden">
+      <div class="card upload-card">
+        <div class="upload-card-header">
+          <div>
+            <h3>Importar Folha de Pagamento em PDF</h3>
+            <p>Arraste o arquivo PDF ou selecione do computador para extração automática</p>
+          </div>
+          <button id="btn-close-upload" class="btn-close" aria-label="Fechar">&times;</button>
+        </div>
+
+        <div id="drop-zone" class="drop-zone">
+          <input type="file" id="pdf-file-input" accept=".pdf" class="file-input">
+          <div class="drop-zone-content">
+            <div class="drop-zone-icon">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <path d="M12 18v-6"></path>
+                <path d="m9 15 3-3 3 3"></path>
+              </svg>
+            </div>
+            <p class="drop-text-primary">Arraste seu arquivo PDF aqui ou <span>clique para navegar</span></p>
+            <p class="drop-text-secondary">Suporta folhas completas com múltiplos colaboradores e quebras de página</p>
+          </div>
+        </div>
+
+        <div id="upload-progress" class="upload-progress hidden">
+          <div class="spinner"></div>
+          <span id="upload-status-text">Processando dados e gerando relatório...</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Barra de Períodos Armazenados -->
+    <section class="period-navigator-section">
+      <div class="section-header-compact">
+        <div class="period-title-wrap">
+          <span class="badge badge-info">Períodos Armazenados</span>
+          <span class="helper-text">Classificação automática por competência</span>
+        </div>
+        <div class="period-tabs-wrapper">
+          <div id="period-tabs" class="period-tabs">
+            <!-- Tabs dinâmicas injetadas via JS -->
+            <div class="tab-placeholder">Carregando períodos...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Relatório Ativo -->
+    <div id="report-view" class="report-view">
+      
+      <!-- Detalhes do Período Selecionado -->
+      <section class="period-summary-banner">
+        <div class="banner-info">
+          <div class="banner-title-group">
+            <h2 id="view-periodo-texto">Carregando...</h2>
+            <span id="view-competencia" class="badge badge-competencia">--/----</span>
+          </div>
+          <p id="view-empresa-info" class="banner-empresa">Empresa: -- | CNPJ: --</p>
+        </div>
+
+        <div class="banner-actions">
+          <button id="btn-toggle-charts" class="btn btn-secondary" title="Exibir/Ocultar Gráficos Analíticos">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 3v18h18"></path>
+              <path d="m19 9-5 5-4-4-3 3"></path>
+            </svg>
+            <span id="chart-toggle-text">Ver Gráficos</span>
+          </button>
+          
+          <button id="btn-export-excel" class="btn btn-secondary" title="Exportar para Excel (.xlsx)">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="8" y1="13" x2="16" y2="13"></line>
+              <line x1="8" y1="17" x2="16" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            Excel
+          </button>
+
+          <button id="btn-export-csv" class="btn btn-secondary" title="Baixar arquivo CSV">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            CSV
+          </button>
+
+          <button id="btn-print" class="btn btn-secondary" title="Imprimir Relatório ou Salvar em PDF">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Imprimir Relatório
+          </button>
+
+          <button id="btn-delete-periodo" class="btn btn-danger-outline" title="Excluir este período do sistema">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- Grade de Cards de Indicadores (KPIs) -->
+      <section class="kpi-grid">
+        <div class="kpi-card card-colab">
+          <div class="kpi-icon">👥</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Colaboradores</span>
+            <span id="kpi-colaboradores" class="kpi-value">0</span>
+            <span class="kpi-hint">Listados no período</span>
+          </div>
+        </div>
+
+        <div class="kpi-card card-salario">
+          <div class="kpi-icon">💼</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Salários Base</span>
+            <span id="kpi-salarios" class="kpi-value font-mono">R$ 0,00</span>
+            <span class="kpi-hint">Soma contratual</span>
+          </div>
+        </div>
+
+        <div class="kpi-card card-proventos">
+          <div class="kpi-icon">📈</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Total Proventos</span>
+            <span id="kpi-proventos" class="kpi-value font-mono">R$ 0,00</span>
+            <span class="kpi-hint">Remuneração bruta total</span>
+          </div>
+        </div>
+
+        <div class="kpi-card card-adiantamento">
+          <div class="kpi-icon">🔄</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Adiantamento Anterior</span>
+            <span id="kpi-adiantamento" class="kpi-value font-mono">R$ 0,00</span>
+            <span class="kpi-hint">Antecipações compensadas</span>
+          </div>
+        </div>
+
+        <div class="kpi-card card-liquido">
+          <div class="kpi-icon">💵</div>
+          <div class="kpi-body">
+            <span class="kpi-label">Total Líquido</span>
+            <span id="kpi-liquido" class="kpi-value font-mono text-success">R$ 0,00</span>
+            <span class="kpi-hint">Valor efetivo a depositar</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Painel de Gráficos (Ocultável) -->
+      <section id="charts-panel" class="charts-section hidden">
+        <div class="card chart-card">
+          <div class="chart-header">
+            <h4>Composição da Folha de Pagamento</h4>
+            <span class="chart-subtitle">Proventos vs Adiantamento Anterior vs Descontos vs Líquido</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="canvas-composicao"></canvas>
+          </div>
+        </div>
+
+        <div class="card chart-card">
+          <div class="chart-header">
+            <h4>Maiores Remunerações no Período</h4>
+            <span class="chart-subtitle">Comparativo Proventos x Líquido</span>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="canvas-top-salarios"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tabela Principal de Relatório -->
+      <section class="card table-card">
+        
+        <!-- Barra de Filtros e Busca -->
+        <div class="table-controls">
+          <div class="search-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="search-input" placeholder="Buscar por colaborador ou código...">
+            <button id="btn-clear-search" class="btn-clear hidden">&times;</button>
+          </div>
+
+          <div class="filter-group">
+            <label for="filter-adiantamento" class="filter-label">Filtro:</label>
+            <select id="filter-adiantamento" class="form-select">
+              <option value="all">Todos os Colaboradores</option>
+              <option value="with_adv">Com Adiantamento Anterior</option>
+              <option value="without_adv">Sem Adiantamento Anterior</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label for="sort-select" class="filter-label">Ordenar por:</label>
+            <select id="sort-select" class="form-select">
+              <option value="nome_asc">Nome (A - Z)</option>
+              <option value="nome_desc">Nome (Z - A)</option>
+              <option value="liquido_desc">Maior Líquido</option>
+              <option value="proventos_desc">Maior Provento</option>
+              <option value="adiantamento_desc">Maior Adiantamento</option>
+              <option value="salario_desc">Maior Salário Base</option>
+            </select>
+          </div>
+
+          <div class="record-counter">
+            Exibindo <strong id="visible-count">0</strong> de <strong id="total-count">0</strong>
+          </div>
+        </div>
+
+        <!-- Tabela Estruturada -->
+        <div class="table-responsive">
+          <table class="report-table" id="report-table">
+            <thead>
+              <tr>
+                <th class="col-periodo">Período</th>
+                <th class="col-nome">Colaborador / Função</th>
+                <th class="col-num text-right">Salário</th>
+                <th class="col-num text-right">Proventos</th>
+                <th class="col-num text-right">Adiantamento Anterior</th>
+                <th class="col-num text-right">Total Líquido</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+              <!-- Linhas preenchidas via JS -->
+            </tbody>
+            <tfoot id="table-foot">
+              <tr class="summary-row">
+                <td colspan="2" class="text-bold">TOTAIS CONSOLIDADOS (<span id="foot-count">0</span> colaboradores)</td>
+                <td id="foot-salario" class="col-num text-right font-mono text-bold">R$ 0,00</td>
+                <td id="foot-proventos" class="col-num text-right font-mono text-bold">R$ 0,00</td>
+                <td id="foot-adiantamento" class="col-num text-right font-mono text-bold text-amber">R$ 0,00</td>
+                <td id="foot-liquido" class="col-num text-right font-mono text-bold text-success">R$ 0,00</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div id="table-empty" class="table-empty hidden">
+          <p>Nenhum colaborador encontrado com os filtros aplicados.</p>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Estado Vazio (Sem períodos cadastrados) -->
+    <div id="empty-state" class="empty-state hidden">
+      <div class="empty-icon">📁</div>
+      <h3>Nenhum relatório de folha cadastrado ainda</h3>
+      <p>Envie o primeiro arquivo PDF de folha de pagamento para extrair os dados e começar a visualização dos relatórios classificados por período.</p>
+      <button id="btn-empty-upload" class="btn btn-primary">Fazer Upload de Folha em PDF</button>
+    </div>
+
+  </main>
+
+  <!-- Cabeçalho Exclusivo de Impressão -->
+  <div id="print-header" class="print-only">
+    <div class="print-brand">
+      <h2>RELATÓRIO DE FOLHA DE PAGAMENTO & HOLERITES</h2>
+      <p id="print-empresa-info">PRIME PRO EXTREME COSMETICOS INC LTDA</p>
+      <p id="print-periodo-info">Período de: 01/08/2026 a 31/08/2026</p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
