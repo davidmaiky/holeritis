@@ -39,6 +39,7 @@ const dom = {
   selectedCompanyTitle: document.getElementById("selected-company-title"),
   companyCountBadge: document.getElementById("company-count-badge"),
   periodContextHint: document.getElementById("period-context-hint"),
+  btnResetOrder: document.getElementById("btn-reset-order"),
   viewEmpresaNome: document.getElementById("view-empresa-nome"),
   bannerEmpresaTag: document.getElementById("banner-empresa-tag"),
 
@@ -291,6 +292,36 @@ function setupEventListeners() {
 
   // Excluir Período
   dom.btnDeletePeriodo.addEventListener("click", confirmDeletePeriodo);
+
+  // Drag & Drop no container de períodos (para mover ao final da lista)
+  if (dom.periodTabs) {
+    dom.periodTabs.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      handleDragAutoScroll(e);
+    });
+
+    dom.periodTabs.addEventListener("drop", (e) => {
+      if (e.target === dom.periodTabs && draggedPeriodId != null) {
+        e.preventDefault();
+        clearDragOverClasses();
+        const sourceId = Number(draggedPeriodId);
+        const sourceIdx = state.periodos.findIndex(item => item.id === sourceId);
+        if (sourceIdx !== -1 && sourceIdx !== state.periodos.length - 1) {
+          const [movedPeriod] = state.periodos.splice(sourceIdx, 1);
+          state.periodos.push(movedPeriod);
+          savePeriodOrder();
+          renderPeriodTabs(sourceId);
+          showToast(`Período ${movedPeriod.mes_ano || movedPeriod.periodo_texto} movido para o final!`, "info");
+        }
+      }
+    });
+  }
+
+  // Botão de restaurar ordem original dos períodos
+  if (dom.btnResetOrder) {
+    dom.btnResetOrder.addEventListener("click", resetPeriodOrder);
+  }
 }
 
 // Carregar empresas cadastradas da API
@@ -336,6 +367,105 @@ function renderCompanySelector(selectEmpresa = null) {
   updateCompanyDisplay();
 }
 
+// Controle de estado e persistência para Drag & Drop de Folhas e Períodos
+let draggedPeriodId = null;
+let isDraggingTab = false;
+let dragHasMoved = false;
+const STORAGE_KEY_ORDER = "holeritis_periods_custom_order";
+
+function getSavedPeriodOrder() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ORDER);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function applySavedPeriodOrder() {
+  const savedOrder = getSavedPeriodOrder();
+  if (!savedOrder || savedOrder.length === 0 || !state.periodos || state.periodos.length === 0) {
+    return;
+  }
+
+  const orderMap = new Map();
+  savedOrder.forEach((id, idx) => {
+    orderMap.set(Number(id), idx);
+  });
+
+  state.periodos.sort((a, b) => {
+    const hasA = orderMap.has(Number(a.id));
+    const hasB = orderMap.has(Number(b.id));
+
+    if (hasA && hasB) {
+      return orderMap.get(Number(a.id)) - orderMap.get(Number(b.id));
+    }
+    if (!hasA && hasB) {
+      return -1; // Novos relatórios adicionados ficam em destaque no topo
+    }
+    if (hasA && !hasB) {
+      return 1;
+    }
+    return b.id - a.id;
+  });
+}
+
+function savePeriodOrder() {
+  try {
+    const currentIds = state.periodos.map(p => Number(p.id));
+    const previousOrder = getSavedPeriodOrder().map(id => Number(id));
+    
+    // Mesclar: preserva ordem visível atual e mantém IDs de outras empresas filtradas
+    const currentSet = new Set(currentIds);
+    const remaining = previousOrder.filter(id => !currentSet.has(id));
+    const mergedOrder = [...currentIds, ...remaining];
+
+    localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(mergedOrder));
+    updateResetOrderButton();
+  } catch (e) {
+    console.error("Erro ao salvar ordem dos períodos:", e);
+  }
+}
+
+function resetPeriodOrder() {
+  localStorage.removeItem(STORAGE_KEY_ORDER);
+  updateResetOrderButton();
+  loadPeriodos(state.currentPeriodoId);
+  showToast("Ordem dos períodos restaurada para o padrão!", "info");
+}
+
+function updateResetOrderButton() {
+  if (!dom.btnResetOrder) return;
+  const savedOrder = getSavedPeriodOrder();
+  if (savedOrder && savedOrder.length > 0) {
+    dom.btnResetOrder.classList.remove("hidden");
+  } else {
+    dom.btnResetOrder.classList.add("hidden");
+  }
+}
+
+function clearDragOverClasses() {
+  if (!dom.periodTabs) return;
+  dom.periodTabs.querySelectorAll(".period-tab-btn").forEach(el => {
+    el.classList.remove("drag-over-before", "drag-over-after");
+  });
+}
+
+function handleDragAutoScroll(e) {
+  const wrapper = dom.periodTabs ? dom.periodTabs.parentElement : null;
+  if (!wrapper) return;
+  const rect = wrapper.getBoundingClientRect();
+  const threshold = 60;
+  
+  if (e.clientX > rect.right - threshold && wrapper.scrollLeft < wrapper.scrollWidth - wrapper.clientWidth) {
+    wrapper.scrollLeft += 10;
+  } else if (e.clientX < rect.left + threshold && wrapper.scrollLeft > 0) {
+    wrapper.scrollLeft -= 10;
+  }
+}
+
 // Atualizar título visual e contexto da empresa ativa
 function updateCompanyDisplay() {
   if (dom.selectedCompanyTitle) {
@@ -343,9 +473,9 @@ function updateCompanyDisplay() {
   }
   if (dom.periodContextHint) {
     if (state.selectedEmpresa) {
-      dom.periodContextHint.textContent = `Exibindo folhas da empresa: ${state.selectedEmpresa}`;
+      dom.periodContextHint.textContent = `Exibindo folhas da empresa: ${state.selectedEmpresa} • Arraste para reordenar`;
     } else {
-      dom.periodContextHint.textContent = "Classificação automática por Razão Social e competência";
+      dom.periodContextHint.textContent = "Classificação automática por Razão Social e competência • Arraste para reordenar";
     }
   }
 }
@@ -368,12 +498,16 @@ async function loadPeriodos(selectPeriodoId = null) {
 
     state.periodos = data.periodos || [];
 
+    // Aplicar ordenação personalizada do usuário salva se existir
+    applySavedPeriodOrder();
+
     if (state.periodos.length === 0) {
       dom.reportView.classList.add("hidden");
       dom.emptyState.classList.remove("hidden");
       dom.periodTabs.innerHTML = "<span class='tab-placeholder'>Nenhum relatório encontrado para este filtro</span>";
       state.currentPeriodoId = null;
       state.currentRelatorio = null;
+      updateResetOrderButton();
       return;
     }
 
@@ -381,6 +515,7 @@ async function loadPeriodos(selectPeriodoId = null) {
     dom.emptyState.classList.add("hidden");
 
     renderPeriodTabs();
+    updateResetOrderButton();
 
     // Selecionar o primeiro ou o especificado
     const toSelect = selectPeriodoId || (state.currentPeriodoId && state.periodos.some(p => p.id === state.currentPeriodoId) ? state.currentPeriodoId : state.periodos[0].id);
@@ -391,12 +526,23 @@ async function loadPeriodos(selectPeriodoId = null) {
   }
 }
 
-// Renderizar Tabs de Períodos com destaque para a Razão Social da Empresa
-function renderPeriodTabs() {
+// Renderizar Tabs de Períodos com destaque para a Razão Social da Empresa e Suporte a Drag & Drop
+function renderPeriodTabs(highlightId = null) {
   dom.periodTabs.innerHTML = "";
-  state.periodos.forEach(p => {
-    const btn = document.createElement("button");
+  state.periodos.forEach((p, index) => {
+    const btn = document.createElement("div");
+    btn.setAttribute("role", "button");
+    btn.setAttribute("tabindex", "0");
+    btn.setAttribute("draggable", "true");
+    btn.dataset.id = p.id;
+    btn.dataset.index = index;
     btn.className = `period-tab-btn ${p.id === state.currentPeriodoId ? "active" : ""}`;
+    btn.title = "Clique para selecionar • Arraste para mudar a ordem de lugar";
+
+    if (highlightId && p.id === highlightId) {
+      btn.classList.add("just-dropped");
+      setTimeout(() => btn.classList.remove("just-dropped"), 500);
+    }
     
     // Tag da Razão Social (quando estiver em visão global de todas as empresas)
     const empresaTag = (!state.selectedEmpresa && p.empresa) 
@@ -405,12 +551,131 @@ function renderPeriodTabs() {
 
     btn.innerHTML = `
       <div class="tab-header-row">
-        <span class="tab-comp">${p.mes_ano || p.periodo_texto}</span>
+        <div class="tab-title-with-drag">
+          <span class="tab-drag-handle" title="Segure e arraste para mudar a ordem">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="8" cy="5" r="2.2"/>
+              <circle cx="16" cy="5" r="2.2"/>
+              <circle cx="8" cy="12" r="2.2"/>
+              <circle cx="16" cy="12" r="2.2"/>
+              <circle cx="8" cy="19" r="2.2"/>
+              <circle cx="16" cy="19" r="2.2"/>
+            </svg>
+          </span>
+          <span class="tab-comp">${p.mes_ano || p.periodo_texto}</span>
+        </div>
         ${empresaTag}
       </div>
       <span class="tab-sub">${p.total_funcionarios} colaborad. • ${formatBRL(p.total_liquido)}</span>
     `;
-    btn.addEventListener("click", () => selectPeriodo(p.id));
+
+    // Click: seleciona período (ignora se o usuário estava arrastando)
+    btn.addEventListener("click", (e) => {
+      if (dragHasMoved || isDraggingTab) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      selectPeriodo(p.id);
+    });
+
+    // Acessibilidade via teclado (Enter ou Barra de Espaço)
+    btn.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        selectPeriodo(p.id);
+      }
+    });
+
+    // Início do arrasto
+    btn.addEventListener("dragstart", (e) => {
+      draggedPeriodId = p.id;
+      isDraggingTab = true;
+      dragHasMoved = false;
+      btn.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(p.id));
+    });
+
+    // Passar por cima de outro período
+    btn.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      dragHasMoved = true;
+
+      if (draggedPeriodId == null || Number(draggedPeriodId) === p.id) {
+        btn.classList.remove("drag-over-before", "drag-over-after");
+        return;
+      }
+
+      const rect = btn.getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      const isBefore = e.clientX < midX;
+
+      dom.periodTabs.querySelectorAll(".period-tab-btn").forEach(el => {
+        if (el !== btn) el.classList.remove("drag-over-before", "drag-over-after");
+      });
+
+      if (isBefore) {
+        btn.classList.add("drag-over-before");
+        btn.classList.remove("drag-over-after");
+      } else {
+        btn.classList.add("drag-over-after");
+        btn.classList.remove("drag-over-before");
+      }
+
+      handleDragAutoScroll(e);
+    });
+
+    // Sair do elemento alvo
+    btn.addEventListener("dragleave", (e) => {
+      if (!btn.contains(e.relatedTarget)) {
+        btn.classList.remove("drag-over-before", "drag-over-after");
+      }
+    });
+
+    // Soltar elemento para reposicionar
+    btn.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      clearDragOverClasses();
+
+      if (draggedPeriodId == null || Number(draggedPeriodId) === p.id) return;
+
+      const rect = btn.getBoundingClientRect();
+      const isBefore = e.clientX < rect.left + rect.width / 2;
+
+      const sourceId = Number(draggedPeriodId);
+      const targetId = p.id;
+
+      const sourceIdx = state.periodos.findIndex(item => item.id === sourceId);
+      if (sourceIdx === -1) return;
+
+      const [movedPeriod] = state.periodos.splice(sourceIdx, 1);
+      let targetIdx = state.periodos.findIndex(item => item.id === targetId);
+      if (targetIdx === -1) {
+        state.periodos.push(movedPeriod);
+      } else {
+        if (!isBefore) targetIdx += 1;
+        state.periodos.splice(targetIdx, 0, movedPeriod);
+      }
+
+      savePeriodOrder();
+      renderPeriodTabs(sourceId);
+      showToast(`Ordem alterada: ${movedPeriod.mes_ano || movedPeriod.periodo_texto} reposicionado!`, "info");
+    });
+
+    // Finalizar arrasto
+    btn.addEventListener("dragend", () => {
+      btn.classList.remove("is-dragging");
+      clearDragOverClasses();
+      setTimeout(() => {
+        isDraggingTab = false;
+        dragHasMoved = false;
+        draggedPeriodId = null;
+      }, 120);
+    });
+
     dom.periodTabs.appendChild(btn);
   });
 }

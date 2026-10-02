@@ -529,10 +529,17 @@ body.theme-light .dark-icon { display: inline-block; }
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.2s ease, 
+              background-color 0.2s ease, 
+              opacity 0.2s ease;
   min-width: 170px;
   gap: 4px;
+  position: relative;
 }
 
 .period-tab-btn:hover {
@@ -542,11 +549,81 @@ body.theme-light .dark-icon { display: inline-block; }
   transform: translateY(-1px);
 }
 
+.period-tab-btn:active {
+  cursor: grabbing;
+}
+
 .period-tab-btn.active {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.25) 100%);
   border-color: var(--color-primary);
   color: var(--text-primary);
   box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+/* Estado sendo arrastado */
+.period-tab-btn.is-dragging {
+  opacity: 0.45;
+  transform: scale(0.96);
+  border: 1.5px dashed var(--color-primary) !important;
+  background-color: var(--bg-hover) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  cursor: grabbing;
+}
+
+/* Indicador de soltar antes do elemento (esquerda) */
+.period-tab-btn.drag-over-before {
+  transform: translateX(8px);
+  border-color: var(--color-primary);
+}
+
+.period-tab-btn.drag-over-before::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 10%;
+  bottom: 10%;
+  width: 4px;
+  background: linear-gradient(180deg, #60a5fa, var(--color-primary));
+  border-radius: 4px;
+  box-shadow: 0 0 12px var(--color-primary), 0 0 4px #ffffff;
+  pointer-events: none;
+  animation: pulse-drop-indicator 0.8s infinite alternate ease-in-out;
+  z-index: 10;
+}
+
+/* Indicador de soltar depois do elemento (direita) */
+.period-tab-btn.drag-over-after {
+  transform: translateX(-8px);
+  border-color: var(--color-primary);
+}
+
+.period-tab-btn.drag-over-after::after {
+  content: "";
+  position: absolute;
+  right: -8px;
+  top: 10%;
+  bottom: 10%;
+  width: 4px;
+  background: linear-gradient(180deg, #60a5fa, var(--color-primary));
+  border-radius: 4px;
+  box-shadow: 0 0 12px var(--color-primary), 0 0 4px #ffffff;
+  pointer-events: none;
+  animation: pulse-drop-indicator 0.8s infinite alternate ease-in-out;
+  z-index: 10;
+}
+
+@keyframes pulse-drop-indicator {
+  0% { opacity: 0.7; transform: scaleY(0.9); }
+  100% { opacity: 1; transform: scaleY(1.05); }
+}
+
+@keyframes drop-success-flash {
+  0% { transform: scale(1.05); box-shadow: 0 0 18px rgba(59, 130, 246, 0.6); border-color: var(--color-primary); }
+  100% { transform: scale(1); box-shadow: none; }
+}
+
+.period-tab-btn.just-dropped {
+  animation: drop-success-flash 0.45s ease-out;
 }
 
 .tab-header-row {
@@ -555,6 +632,33 @@ body.theme-light .dark-icon { display: inline-block; }
   justify-content: space-between;
   width: 100%;
   gap: 8px;
+}
+
+.tab-title-with-drag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  opacity: 0.35;
+  cursor: grab;
+  transition: opacity 0.2s, color 0.2s, transform 0.15s;
+  flex-shrink: 0;
+}
+
+.period-tab-btn:hover .tab-drag-handle {
+  opacity: 0.9;
+  color: var(--color-primary);
+}
+
+.period-tab-btn.active .tab-drag-handle {
+  color: var(--color-primary);
+  opacity: 0.75;
 }
 
 .tab-comp {
@@ -589,6 +693,30 @@ body.theme-light .dark-icon { display: inline-block; }
 .period-tab-btn.active .tab-sub {
   color: var(--color-primary);
   font-weight: 500;
+}
+
+/* Botão de Restaurar Ordem Original */
+.btn-reset-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background-color: var(--bg-surface);
+  border: 1px dashed var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+
+.btn-reset-order:hover {
+  background-color: var(--bg-hover);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  border-style: solid;
 }
 
 /* Banner de Informações do Período e Empresa */
