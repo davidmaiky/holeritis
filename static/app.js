@@ -15,7 +15,7 @@ const state = {
   sortBy: "nome_asc",
   showCharts: false,
   activeChartTab: "12m", // "12m", "periodo" ou "headcount"
-  
+
   // Filtros de Data e Período
   dateFilter: {
     preset: "all", // "all", "last_12m", "last_6m", "last_3m", "current_year"
@@ -51,7 +51,7 @@ const dom = {
   pdfFileInput: document.getElementById("pdf-file-input"),
   uploadProgress: document.getElementById("upload-progress"),
   uploadStatusText: document.getElementById("upload-status-text"),
-  
+
   // Elementos da Empresa / Razão Social
   companyFilterSelect: document.getElementById("company-filter-select"),
   selectedCompanyTitle: document.getElementById("selected-company-title"),
@@ -75,15 +75,15 @@ const dom = {
   reportView: document.getElementById("report-view"),
   emptyState: document.getElementById("empty-state"),
   btnEmptyUpload: document.getElementById("btn-empty-upload"),
-  
+
   viewPeriodoTexto: document.getElementById("view-periodo-texto"),
   viewCompetencia: document.getElementById("view-competencia"),
   viewEmpresaInfo: document.getElementById("view-empresa-info"),
-  
+
   btnToggleCharts: document.getElementById("btn-toggle-charts"),
   chartToggleText: document.getElementById("chart-toggle-text"),
   chartsPanel: document.getElementById("charts-panel"),
-  
+
   // Abas de Gráficos
   tabChart12m: document.getElementById("tab-chart-12m"),
   tabChartPeriodo: document.getElementById("tab-chart-periodo"),
@@ -119,21 +119,21 @@ const dom = {
   btnExportCsv: document.getElementById("btn-export-csv"),
   btnPrint: document.getElementById("btn-print"),
   btnDeletePeriodo: document.getElementById("btn-delete-periodo"),
-  
+
   kpiColaboradores: document.getElementById("kpi-colaboradores"),
   kpiSalarios: document.getElementById("kpi-salarios"),
   kpiProventos: document.getElementById("kpi-proventos"),
   kpiAdiantamento: document.getElementById("kpi-adiantamento"),
   kpiDescontos: document.getElementById("kpi-descontos"),
   kpiLiquido: document.getElementById("kpi-liquido"),
-  
+
   searchInput: document.getElementById("search-input"),
   btnClearSearch: document.getElementById("btn-clear-search"),
   filterAdiantamento: document.getElementById("filter-adiantamento"),
   sortSelect: document.getElementById("sort-select"),
   visibleCount: document.getElementById("visible-count"),
   totalCount: document.getElementById("total-count"),
-  
+
   tableBody: document.getElementById("table-body"),
   tableEmpty: document.getElementById("table-empty"),
   footCount: document.getElementById("foot-count"),
@@ -154,11 +154,27 @@ const dom = {
   modalEmpCodigo: document.getElementById("modal-emp-codigo"),
   modalEmpFuncao: document.getElementById("modal-emp-funcao"),
   modalEmpPeriodo: document.getElementById("modal-emp-periodo"),
+  modalSalarioTop: document.getElementById("modal-salario-top"),
+  modalEmpAdmissao: document.getElementById("modal-emp-admissao"),
+  modalEmpSituacao: document.getElementById("modal-emp-situacao"),
+  modalEmpDepIr: document.getElementById("modal-emp-dep-ir"),
+  modalEventosTbody: document.getElementById("modal-eventos-tbody"),
+  modalEventosCount: document.getElementById("modal-eventos-count"),
+  modalTableTotalProventos: document.getElementById("modal-table-total-proventos"),
+  modalTableTotalDescontos: document.getElementById("modal-table-total-descontos"),
   modalSalario: document.getElementById("modal-salario"),
   modalProventos: document.getElementById("modal-proventos"),
   modalAdiantamento: document.getElementById("modal-adiantamento"),
   modalDescontos: document.getElementById("modal-descontos"),
   modalLiquido: document.getElementById("modal-liquido"),
+  modalBaseInssEmpresa: document.getElementById("modal-base-inss-empresa"),
+  modalBaseInssFunc: document.getElementById("modal-base-inss-func"),
+  modalBaseInss13: document.getElementById("modal-base-inss-13"),
+  modalBaseFgts: document.getElementById("modal-base-fgts"),
+  modalBaseFgts13: document.getElementById("modal-base-fgts-13"),
+  modalValorFgts: document.getElementById("modal-valor-fgts"),
+  modalBaseIrrf: document.getElementById("modal-base-irrf"),
+  modalDeducoesIrrf: document.getElementById("modal-deducoes-irrf"),
 
   printEmpresaInfo: document.getElementById("print-empresa-info"),
   printPeriodoInfo: document.getElementById("print-periodo-info"),
@@ -172,6 +188,17 @@ function formatBRL(value) {
     style: "currency",
     currency: "BRL"
   }).format(value);
+}
+
+// Sanitização HTML segura
+function escapeHtml(text) {
+  if (text === null || text === undefined) return "";
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // Toast Notificações
@@ -592,7 +619,7 @@ function savePeriodOrder() {
   try {
     const currentIds = state.periodos.map(p => Number(p.id));
     const previousOrder = getSavedPeriodOrder().map(id => Number(id));
-    
+
     // Mesclar: preserva ordem visível atual e mantém IDs de outras empresas filtradas
     const currentSet = new Set(currentIds);
     const remaining = previousOrder.filter(id => !currentSet.has(id));
@@ -634,7 +661,7 @@ function handleDragAutoScroll(e) {
   if (!wrapper) return;
   const rect = wrapper.getBoundingClientRect();
   const threshold = 60;
-  
+
   if (e.clientX > rect.right - threshold && wrapper.scrollLeft < wrapper.scrollWidth - wrapper.clientWidth) {
     wrapper.scrollLeft += 10;
   } else if (e.clientX < rect.left + threshold && wrapper.scrollLeft > 0) {
@@ -788,10 +815,10 @@ function renderPeriodTabs(highlightId = null) {
       btn.classList.add("just-dropped");
       setTimeout(() => btn.classList.remove("just-dropped"), 500);
     }
-    
+
     // Tag da Razão Social (quando estiver em visão global de todas as empresas)
-    const empresaTag = (!state.selectedEmpresa && p.empresa) 
-      ? `<span class="tab-empresa-pill" title="${p.empresa}">${p.empresa}</span>` 
+    const empresaTag = (!state.selectedEmpresa && p.empresa)
+      ? `<span class="tab-empresa-pill" title="${p.empresa}">${p.empresa}</span>`
       : "";
 
     btn.innerHTML = `
@@ -983,7 +1010,7 @@ function getFilteredAndSortedItems() {
 
   // Filtro por Texto de Busca (Nome ou Código)
   if (state.searchQuery) {
-    items = items.filter(it => 
+    items = items.filter(it =>
       it.nome.toLowerCase().includes(state.searchQuery) ||
       (it.codigo && it.codigo.toLowerCase().includes(state.searchQuery)) ||
       (it.funcao && it.funcao.toLowerCase().includes(state.searchQuery))
@@ -1072,9 +1099,9 @@ function renderTable() {
       <td class="col-num text-right font-mono">${formatBRL(emp.salario)}</td>
       <td class="col-num text-right font-mono">${formatBRL(emp.proventos)}</td>
       <td class="col-num text-right font-mono">
-        ${emp.adiantamento_anterior > 0 
-          ? `<span class="badge-adiantamento">${formatBRL(emp.adiantamento_anterior)}</span>` 
-          : `<span class="text-muted">R$ 0,00</span>`}
+        ${emp.adiantamento_anterior > 0
+        ? `<span class="badge-adiantamento">${formatBRL(emp.adiantamento_anterior)}</span>`
+        : `<span class="text-muted">R$ 0,00</span>`}
       </td>
       <td class="col-num text-right font-mono text-danger font-semibold">${formatBRL(emp.descontos)}</td>
       <td class="col-num text-right font-mono text-bold text-success">${formatBRL(emp.liquido)}</td>
@@ -1238,27 +1265,138 @@ function exportToExcel() {
   showToast("Planilha Excel gerada com sucesso!", "success");
 }
 
-// Funções do Modal de Holerite Individual
+// Funções do Modal de Holerite Individual Detalhado
 function openHoleriteModal(emp) {
   state.currentModalEmployee = emp;
   const rel = state.currentRelatorio || {};
+  const dados = emp.dados_adicionais || {};
+  const bases = emp.bases || {};
 
-  dom.modalCompBadge.textContent = rel.mes_ano || "--/----";
-  dom.modalEmpresaNome.textContent = rel.empresa || "EMPRESA";
-  dom.modalEmpresaCnpj.textContent = `CNPJ: ${rel.cnpj || "Não informado"}`;
+  // Cabeçalho da Empresa e Período
+  if (dom.modalCompBadge) dom.modalCompBadge.textContent = rel.mes_ano || "--/----";
+  if (dom.modalEmpresaNome) dom.modalEmpresaNome.textContent = rel.empresa || "EMPRESA";
+  if (dom.modalEmpresaCnpj) dom.modalEmpresaCnpj.textContent = `CNPJ: ${rel.cnpj || "Não informado"}`;
 
-  dom.modalEmpNome.textContent = emp.nome;
-  dom.modalEmpCodigo.textContent = emp.codigo ? `Cód: ${emp.codigo}` : "Cód: Não informado";
-  dom.modalEmpFuncao.textContent = emp.funcao ? `Cargo: ${emp.funcao}` : "Cargo: Não informado";
-  dom.modalEmpPeriodo.textContent = `Período de: ${rel.periodo_texto || "--"}`;
+  // Ficha Cadastral do Colaborador
+  if (dom.modalEmpNome) dom.modalEmpNome.textContent = emp.nome || "Colaborador";
+  if (dom.modalEmpCodigo) dom.modalEmpCodigo.textContent = emp.codigo ? `Cód: ${emp.codigo}` : "Cód: -";
+  if (dom.modalEmpFuncao) dom.modalEmpFuncao.textContent = emp.funcao ? `Cargo: ${emp.funcao}` : "Cargo: Não informado";
+  if (dom.modalEmpPeriodo) dom.modalEmpPeriodo.textContent = `Período de Apuração: ${rel.periodo_texto || "--"}`;
+  if (dom.modalSalarioTop) dom.modalSalarioTop.textContent = formatBRL(emp.salario);
 
-  dom.modalSalario.textContent = formatBRL(emp.salario);
-  dom.modalProventos.textContent = formatBRL(emp.proventos);
-  dom.modalAdiantamento.textContent = formatBRL(emp.adiantamento_anterior);
-  dom.modalDescontos.textContent = formatBRL(emp.descontos);
-  dom.modalLiquido.textContent = formatBRL(emp.liquido);
+  // Metadados funcionais adicionais
+  if (dom.modalEmpAdmissao) dom.modalEmpAdmissao.textContent = `Admissão: ${dados.admissao || "-"}`;
+  if (dom.modalEmpSituacao) dom.modalEmpSituacao.textContent = `Situação: ${dados.situacao || "Ativo"}`;
+  if (dom.modalEmpDepIr) dom.modalEmpDepIr.textContent = `Dep. IR: ${dados.dependentes_ir !== undefined ? dados.dependentes_ir : 0}`;
 
+  // Renderização da Tabela de Eventos (Créditos / Proventos e Débitos / Descontos)
+  if (dom.modalEventosTbody) {
+    dom.modalEventosTbody.innerHTML = "";
+    const eventos = Array.isArray(emp.eventos) && emp.eventos.length > 0 ? emp.eventos : [];
+
+    let somaProventos = 0;
+    let somaDescontos = 0;
+
+    if (eventos.length > 0) {
+      if (dom.modalEventosCount) {
+        dom.modalEventosCount.textContent = `${eventos.length} rubricas detalhadas`;
+      }
+
+      eventos.forEach(evt => {
+        const tr = document.createElement("tr");
+        const isProvento = evt.tipo === "provento";
+        const val = Number(evt.valor) || 0;
+
+        if (isProvento) {
+          somaProventos += val;
+        } else {
+          somaDescontos += val;
+        }
+
+        const refText = evt.referencia && evt.referencia !== "-" ? evt.referencia : "";
+        const proventoCell = isProvento
+          ? `<span class="event-tag-provento font-mono font-bold">${formatBRL(val)}</span>`
+          : `<span class="text-muted font-mono">-</span>`;
+        const descontoCell = !isProvento
+          ? `<span class="event-tag-desconto font-mono font-bold">${formatBRL(val)}</span>`
+          : `<span class="text-muted font-mono">-</span>`;
+
+        tr.innerHTML = `
+          <td class="col-cod text-center font-mono text-muted">${evt.codigo || "-"}</td>
+          <td class="col-desc"><strong>${escapeHtml(evt.descricao || "Item")}</strong></td>
+          <td class="col-ref text-center font-mono">${refText || "-"}</td>
+          <td class="col-prov text-right">${proventoCell}</td>
+          <td class="col-desc-val text-right">${descontoCell}</td>
+        `;
+        dom.modalEventosTbody.appendChild(tr);
+      });
+
+      if (dom.modalTableTotalProventos) dom.modalTableTotalProventos.textContent = formatBRL(somaProventos || emp.proventos);
+      if (dom.modalTableTotalDescontos) dom.modalTableTotalDescontos.textContent = formatBRL(somaDescontos || emp.descontos);
+    } else {
+      // Fallback gracioso para períodos legados
+      if (dom.modalEventosCount) dom.modalEventosCount.textContent = "Resumo Consolidado";
+      dom.modalEventosTbody.innerHTML = `
+        <tr>
+          <td class="text-center font-mono text-muted">001</td>
+          <td><strong>Salário Base / Proventos Contratuais</strong></td>
+          <td class="text-center font-mono">30d</td>
+          <td class="text-right font-mono event-tag-provento">${formatBRL(emp.proventos)}</td>
+          <td class="text-right font-mono text-muted">-</td>
+        </tr>
+        ${emp.adiantamento_anterior > 0 ? `
+        <tr>
+          <td class="text-center font-mono text-muted">012</td>
+          <td><strong>Adiantamento Anterior Compensado</strong></td>
+          <td class="text-center font-mono">-</td>
+          <td class="text-right font-mono text-muted">-</td>
+          <td class="text-right font-mono event-tag-desconto">${formatBRL(emp.adiantamento_anterior)}</td>
+        </tr>` : ""}
+        ${emp.descontos > 0 ? `
+        <tr>
+          <td class="text-center font-mono text-muted">999</td>
+          <td><strong>Descontos e Retenções Legais Totais</strong></td>
+          <td class="text-center font-mono">-</td>
+          <td class="text-right font-mono text-muted">-</td>
+          <td class="text-right font-mono event-tag-desconto">${formatBRL(emp.descontos)}</td>
+        </tr>` : ""}
+      `;
+      if (dom.modalTableTotalProventos) dom.modalTableTotalProventos.textContent = formatBRL(emp.proventos);
+      if (dom.modalTableTotalDescontos) dom.modalTableTotalDescontos.textContent = formatBRL(emp.descontos);
+    }
+  }
+
+  // Resumo Financeiro em Destaque
+  if (dom.modalProventos) dom.modalProventos.textContent = formatBRL(emp.proventos);
+  if (dom.modalAdiantamento) dom.modalAdiantamento.textContent = formatBRL(emp.adiantamento_anterior);
+  if (dom.modalDescontos) dom.modalDescontos.textContent = formatBRL(emp.descontos);
+  if (dom.modalLiquido) dom.modalLiquido.textContent = formatBRL(emp.liquido);
+
+  // Quadro de Bases de Cálculo Oficiais
+  const valSalarioBase = emp.salario || 0;
+  const valBaseInssEmp = bases.base_inss_empresa !== undefined ? bases.base_inss_empresa : valSalarioBase;
+  const valBaseInssFunc = bases.base_inss_funcionario !== undefined ? bases.base_inss_funcionario : valSalarioBase;
+  const valBaseInss13 = bases.base_inss_13 || 0;
+  const valBaseFgts = bases.base_fgts !== undefined ? bases.base_fgts : valSalarioBase;
+  const valBaseFgts13 = bases.base_fgts_13 || 0;
+  const valValorFgts = bases.valor_fgts !== undefined ? bases.valor_fgts : (valBaseFgts * 0.08);
+  const valBaseIrrf = bases.base_irrf !== undefined ? bases.base_irrf : valSalarioBase;
+  const valDeducoesIrrf = bases.deducoes_irrf || 0;
+
+  if (dom.modalSalario) dom.modalSalario.textContent = formatBRL(valSalarioBase);
+  if (dom.modalBaseInssEmpresa) dom.modalBaseInssEmpresa.textContent = formatBRL(valBaseInssEmp);
+  if (dom.modalBaseInssFunc) dom.modalBaseInssFunc.textContent = formatBRL(valBaseInssFunc);
+  if (dom.modalBaseInss13) dom.modalBaseInss13.textContent = formatBRL(valBaseInss13);
+  if (dom.modalBaseFgts) dom.modalBaseFgts.textContent = formatBRL(valBaseFgts);
+  if (dom.modalBaseFgts13) dom.modalBaseFgts13.textContent = formatBRL(valBaseFgts13);
+  if (dom.modalValorFgts) dom.modalValorFgts.textContent = formatBRL(valValorFgts);
+  if (dom.modalBaseIrrf) dom.modalBaseIrrf.textContent = formatBRL(valBaseIrrf);
+  if (dom.modalDeducoesIrrf) dom.modalDeducoesIrrf.textContent = formatBRL(valDeducoesIrrf);
+
+  // Exibe o modal e reseta rolagem
   dom.modalHolerite.classList.remove("hidden");
+  const scrollArea = dom.modalHolerite.querySelector(".modal-body-scroll");
+  if (scrollArea) scrollArea.scrollTop = 0;
 }
 
 function closeHoleriteModal() {
@@ -1270,11 +1408,58 @@ function printHoleriteIndividual() {
   if (!state.currentModalEmployee) return;
   const emp = state.currentModalEmployee;
   const rel = state.currentRelatorio || {};
+  const bases = emp.bases || {};
+  const dados = emp.dados_adicionais || {};
+  const eventos = Array.isArray(emp.eventos) && emp.eventos.length > 0 ? emp.eventos : [];
 
-  const printWindow = window.open("", "_blank", "width=850,height=750");
+  const printWindow = window.open("", "_blank", "width=900,height=800");
   if (!printWindow) {
     showToast("Permita pop-ups no navegador para imprimir o recibo individual", "error");
     return;
+  }
+
+  // Gera linhas da tabela de eventos para impressão
+  let eventosRowsHtml = "";
+  if (eventos.length > 0) {
+    eventosRowsHtml = eventos.map(evt => {
+      const isProv = evt.tipo === "provento";
+      const v = Number(evt.valor) || 0;
+      return `
+        <tr>
+          <td style="text-align:center; font-family:monospace;">${evt.codigo || "-"}</td>
+          <td><strong>${escapeHtml(evt.descricao || "")}</strong></td>
+          <td style="text-align:center; font-family:monospace;">${evt.referencia || "-"}</td>
+          <td style="text-align:right; font-family:monospace; color: ${isProv ? '#047857' : '#999'};">${isProv ? formatBRL(v) : "-"}</td>
+          <td style="text-align:right; font-family:monospace; color: ${!isProv ? '#b91c1c' : '#999'};">${!isProv ? formatBRL(v) : "-"}</td>
+        </tr>
+      `;
+    }).join("");
+  } else {
+    eventosRowsHtml = `
+      <tr>
+        <td style="text-align:center; font-family:monospace;">001</td>
+        <td><strong>Salário Base / Proventos</strong></td>
+        <td style="text-align:center; font-family:monospace;">30d</td>
+        <td style="text-align:right; font-family:monospace; color:#047857;">${formatBRL(emp.proventos)}</td>
+        <td style="text-align:right; font-family:monospace; color:#999;">-</td>
+      </tr>
+      ${emp.adiantamento_anterior > 0 ? `
+      <tr>
+        <td style="text-align:center; font-family:monospace;">012</td>
+        <td><strong>Adiantamento Anterior</strong></td>
+        <td style="text-align:center; font-family:monospace;">-</td>
+        <td style="text-align:right; font-family:monospace; color:#999;">-</td>
+        <td style="text-align:right; font-family:monospace; color:#b91c1c;">${formatBRL(emp.adiantamento_anterior)}</td>
+      </tr>` : ""}
+      ${emp.descontos > 0 ? `
+      <tr>
+        <td style="text-align:center; font-family:monospace;">999</td>
+        <td><strong>Descontos e Retenções</strong></td>
+        <td style="text-align:center; font-family:monospace;">-</td>
+        <td style="text-align:right; font-family:monospace; color:#999;">-</td>
+        <td style="text-align:right; font-family:monospace; color:#b91c1c;">${formatBRL(emp.descontos)}</td>
+      </tr>` : ""}
+    `;
   }
 
   printWindow.document.write(`
@@ -1284,25 +1469,38 @@ function printHoleriteIndividual() {
       <meta charset="UTF-8">
       <title>Recibo de Pagamento - ${emp.nome}</title>
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 30px; color: #111; font-size: 13px; line-height: 1.5; }
-        .receipt-card { border: 2px solid #222; padding: 24px; max-width: 650px; margin: 0 auto; }
-        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #222; padding-bottom: 12px; margin-bottom: 16px; }
-        .company h2 { margin: 0 0 4px 0; font-size: 17px; }
-        .company p { margin: 0; font-size: 11px; color: #555; }
-        .comp { text-align: right; font-weight: bold; font-size: 13px; }
-        .emp-box { background: #f5f5f5; border: 1px solid #ddd; padding: 12px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .val-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-        .val-table th, .val-table td { padding: 10px 12px; border-bottom: 1px solid #ddd; text-align: left; }
-        .val-table th { background: #f0f0f0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 25px; color: #111; font-size: 12px; line-height: 1.4; }
+        .receipt-card { border: 2px solid #111; padding: 20px; max-width: 820px; margin: 0 auto; background: #fff; }
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 12px; }
+        .company h2 { margin: 0 0 4px 0; font-size: 16px; font-weight: 800; }
+        .company p { margin: 0; font-size: 11px; color: #444; }
+        .comp { text-align: right; font-weight: bold; font-size: 12px; }
+        .emp-box { background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px 14px; margin-bottom: 14px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; font-size: 11px; }
+        .val-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 11px; }
+        .val-table th, .val-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+        .val-table th { background: #f1f5f9; border-top: 1px solid #cbd5e1; border-bottom: 2px solid #94a3b8; font-size: 10px; text-transform: uppercase; }
         .text-right { text-align: right; }
-        .font-mono { font-family: monospace; font-size: 13px; }
-        .total-row { background: #e8f5e9; font-weight: bold; font-size: 14px; }
-        .total-row td { border-top: 2px solid #2e7d32; border-bottom: 2px solid #2e7d32; color: #1b5e20; }
-        .signatures { margin-top: 50px; display: flex; justify-content: space-between; gap: 40px; }
+        .text-center { text-align: center; }
+        .font-mono { font-family: monospace; font-size: 12px; }
+        .totais-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+        .tot-card { border: 1px solid #cbd5e1; padding: 8px; text-align: center; border-radius: 4px; background: #f8fafc; }
+        .tot-card .l { font-size: 9px; text-transform: uppercase; color: #64748b; font-weight: bold; }
+        .tot-card .v { font-size: 13px; font-weight: bold; margin-top: 2px; }
+        .liq-card { background: #ecfdf5; border-color: #10b981; }
+        .liq-card .l { color: #047857; }
+        .liq-card .v { color: #047857; font-size: 15px; }
+        .bases-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; border: 1px solid #cbd5e1; }
+        .bases-table th { background: #f8fafc; padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600; text-align: center; }
+        .bases-table td { padding: 6px; border: 1px solid #cbd5e1; text-align: right; font-family: monospace; font-weight: bold; }
+        .signatures { margin-top: 40px; display: flex; justify-content: space-between; gap: 40px; }
         .sig-box { flex: 1; text-align: center; }
         .sig-line { border-top: 1px solid #000; margin-bottom: 6px; }
         .sig-box p { margin: 0; font-size: 10px; }
-        .footer-note { margin-top: 24px; font-size: 10px; color: #777; text-align: center; }
+        .footer-note { margin-top: 20px; font-size: 9px; color: #64748b; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 6px; }
+        @media print {
+          body { padding: 0; }
+          .receipt-card { border: 1px solid #000; }
+        }
       </style>
     </head>
     <body>
@@ -1313,7 +1511,7 @@ function printHoleriteIndividual() {
             <p>CNPJ: ${rel.cnpj || "Não informado"}</p>
           </div>
           <div class="comp">
-            RECIBO DE PAGAMENTO<br>
+            RECIBO DE PAGAMENTO DE SALÁRIO<br>
             Competência: ${rel.mes_ano || "--/----"}
           </div>
         </div>
@@ -1322,36 +1520,68 @@ function printHoleriteIndividual() {
           <div><strong>Colaborador:</strong> ${emp.nome}</div>
           <div><strong>Código:</strong> ${emp.codigo || "-"}</div>
           <div><strong>Cargo/Função:</strong> ${emp.funcao || "-"}</div>
+          <div><strong>Admissão:</strong> ${dados.admissao || "-"}</div>
+          <div><strong>Situação:</strong> ${dados.situacao || "Ativo"}</div>
           <div><strong>Período:</strong> ${rel.periodo_texto || "-"}</div>
         </div>
 
         <table class="val-table">
           <thead>
             <tr>
-              <th>Descrição</th>
-              <th class="text-right">Valor (R$)</th>
+              <th style="width: 50px; text-align:center;">Cód</th>
+              <th>Descrição do Evento / Rubrica</th>
+              <th style="width: 80px; text-align:center;">Referência</th>
+              <th style="width: 130px; text-align:right;">Proventos (R$)</th>
+              <th style="width: 130px; text-align:right;">Descontos (R$)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${eventosRowsHtml}
+          </tbody>
+        </table>
+
+        <div class="totais-bar">
+          <div class="tot-card">
+            <div class="l">Total Proventos</div>
+            <div class="v font-mono" style="color: #2563eb;">${formatBRL(emp.proventos)}</div>
+          </div>
+          <div class="tot-card">
+            <div class="l">Adiantamento</div>
+            <div class="v font-mono" style="color: #d97706;">${formatBRL(emp.adiantamento_anterior)}</div>
+          </div>
+          <div class="tot-card">
+            <div class="l">Total Descontos</div>
+            <div class="v font-mono" style="color: #dc2626;">${formatBRL(emp.descontos)}</div>
+          </div>
+          <div class="tot-card liq-card">
+            <div class="l">Valor Líquido</div>
+            <div class="v font-mono">${formatBRL(emp.liquido)}</div>
+          </div>
+        </div>
+
+        <table class="bases-table">
+          <thead>
+            <tr>
+              <th>Salário Base</th>
+              <th>Base INSS Empresa</th>
+              <th>Base INSS Func.</th>
+              <th>Base INSS 13º</th>
+              <th>Base F.G.T.S.</th>
+              <th>F.G.T.S. do Mês</th>
+              <th>Base I.R.R.F.</th>
+              <th>Deduções IRRF</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td>Salário Base Contratual</td>
-              <td class="text-right font-mono">${formatBRL(emp.salario)}</td>
-            </tr>
-            <tr>
-              <td>Total de Proventos (Bruto)</td>
-              <td class="text-right font-mono">${formatBRL(emp.proventos)}</td>
-            </tr>
-            <tr>
-              <td>(-) Adiantamento Anterior Compensado</td>
-              <td class="text-right font-mono">${formatBRL(emp.adiantamento_anterior)}</td>
-            </tr>
-            <tr>
-              <td>(-) Total de Descontos e Retenções</td>
-              <td class="text-right font-mono">${formatBRL(emp.descontos)}</td>
-            </tr>
-            <tr class="total-row">
-              <td>VALOR LÍQUIDO CREDITADO</td>
-              <td class="text-right font-mono">${formatBRL(emp.liquido)}</td>
+              <td>${formatBRL(emp.salario)}</td>
+              <td>${formatBRL(bases.base_inss_empresa !== undefined ? bases.base_inss_empresa : emp.salario)}</td>
+              <td>${formatBRL(bases.base_inss_funcionario !== undefined ? bases.base_inss_funcionario : emp.salario)}</td>
+              <td>${formatBRL(bases.base_inss_13 || 0)}</td>
+              <td>${formatBRL(bases.base_fgts !== undefined ? bases.base_fgts : emp.salario)}</td>
+              <td>${formatBRL(bases.valor_fgts !== undefined ? bases.valor_fgts : (emp.salario * 0.08))}</td>
+              <td>${formatBRL(bases.base_irrf !== undefined ? bases.base_irrf : emp.salario)}</td>
+              <td>${formatBRL(bases.deducoes_irrf || 0)}</td>
             </tr>
           </tbody>
         </table>
@@ -1359,7 +1589,7 @@ function printHoleriteIndividual() {
         <div class="signatures">
           <div class="sig-box">
             <div class="sig-line"></div>
-            <p>EMPREGADOR / RH</p>
+            <p>EMPREGADOR / DEPARTAMENTO PESSOAL</p>
           </div>
           <div class="sig-box">
             <div class="sig-line"></div>
@@ -1368,7 +1598,7 @@ function printHoleriteIndividual() {
         </div>
 
         <div class="footer-note">
-          Emitido em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")} - HoleriteManager
+          Recibo individual emitido pelo Sistema de Holerites em ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}
         </div>
       </div>
       <script>
@@ -1414,7 +1644,7 @@ function renderCharts() {
     const ctxComp = document.getElementById("canvas-composicao");
     if (ctxComp) {
       if (state.chartComposicao) state.chartComposicao.destroy();
-      
+
       const outrosDescontos = Math.max(0, rel.total_descontos - rel.total_adiantamento);
       state.chartComposicao = new Chart(ctxComp, {
         type: "doughnut",
@@ -1488,7 +1718,7 @@ function renderCharts() {
           indexAxis: "y",
           scales: {
             x: {
-              ticks: { color: textColor, callback: (v) => "R$ " + (v/1000).toFixed(0) + "k" },
+              ticks: { color: textColor, callback: (v) => "R$ " + (v / 1000).toFixed(0) + "k" },
               grid: { color: gridColor }
             },
             y: {
@@ -1570,7 +1800,7 @@ function renderCharts() {
               type: "linear",
               display: true,
               position: "right",
-              ticks: { color: textColor, callback: (v) => "R$ " + (v/1000).toFixed(1) + "k" },
+              ticks: { color: textColor, callback: (v) => "R$ " + (v / 1000).toFixed(1) + "k" },
               grid: { drawOnChartArea: false },
               title: { display: true, text: "Média Salarial (R$)", color: textColor, font: { size: 10 } }
             }
@@ -1611,7 +1841,7 @@ async function render12mChart() {
   // Montar parâmetros de busca
   const params = new URLSearchParams();
   if (state.selectedEmpresa) params.append("empresa", state.selectedEmpresa);
-  
+
   const limit = state.chart12mRange === "all" ? 100 : (parseInt(state.chart12mRange) || 12);
   params.append("limite", String(limit));
 
@@ -1630,10 +1860,10 @@ async function render12mChart() {
     // 1. Atualizar KPIs de 12M
     if (dom.kpi12mProventos) dom.kpi12mProventos.textContent = formatBRL(ev.totais.total_proventos);
     if (dom.kpi12mMediaProventos) dom.kpi12mMediaProventos.textContent = `Média: ${formatBRL(ev.totais.media_proventos)}/mês`;
-    
+
     if (dom.kpi12mAdiantamento) dom.kpi12mAdiantamento.textContent = formatBRL(ev.totais.total_adiantamento);
     if (dom.kpi12mPctAdiantamento) dom.kpi12mPctAdiantamento.textContent = `${ev.totais.pct_adiantamento_sobre_proventos}% dos proventos • Média: ${formatBRL(ev.totais.media_adiantamento)}`;
-    
+
     if (dom.kpi12mLiquido) dom.kpi12mLiquido.textContent = formatBRL(ev.totais.total_liquido);
     if (dom.kpi12mPctLiquido) dom.kpi12mPctLiquido.textContent = `${ev.totais.pct_liquido_sobre_proventos}% do bruto • Média: ${formatBRL(ev.totais.media_liquido)}`;
 

@@ -1,9 +1,11 @@
 """
 Gerenciamento de Banco de Dados SQLite para Armazenamento e Consulta de Relatórios de Folha por Período
+Armazena histórico, eventos detalhados (rubricas de crédito e débito) e bases de cálculo.
 """
 
 import sqlite3
 import os
+import json
 from pathlib import Path
 from datetime import datetime
 
@@ -50,9 +52,23 @@ def init_db():
             descontos REAL NOT NULL DEFAULT 0.0,
             adiantamento_anterior REAL NOT NULL DEFAULT 0.0,
             liquido REAL NOT NULL DEFAULT 0.0,
+            eventos TEXT,
+            bases TEXT,
+            dados_adicionais TEXT,
             FOREIGN KEY (periodo_id) REFERENCES periodos(id) ON DELETE CASCADE
         );
         """)
+
+        # Migração automática de colunas para bancos existentes
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(relatorio_itens);")
+        colunas_existentes = [row["name"] for row in cursor.fetchall()]
+        if "eventos" not in colunas_existentes:
+            conn.execute("ALTER TABLE relatorio_itens ADD COLUMN eventos TEXT;")
+        if "bases" not in colunas_existentes:
+            conn.execute("ALTER TABLE relatorio_itens ADD COLUMN bases TEXT;")
+        if "dados_adicionais" not in colunas_existentes:
+            conn.execute("ALTER TABLE relatorio_itens ADD COLUMN dados_adicionais TEXT;")
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_periodo ON relatorio_itens(periodo_id);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_periodos_mes_ano ON periodos(mes_ano);")
@@ -140,13 +156,18 @@ def salvar_relatorio(resumo, employees, nome_arquivo=""):
             ))
             periodo_id = cursor.lastrowid
 
-        # Inserir cada item do funcionário
+        # Inserir cada item do funcionário com eventos e bases serializados
         for emp in employees:
+            eventos_json = json.dumps(emp.get("eventos", []), ensure_ascii=False) if emp.get("eventos") is not None else None
+            bases_json = json.dumps(emp.get("bases", {}), ensure_ascii=False) if emp.get("bases") is not None else None
+            dados_adicionais_json = json.dumps(emp.get("dados_adicionais", {}), ensure_ascii=False) if emp.get("dados_adicionais") is not None else None
+
             cursor.execute("""
                 INSERT INTO relatorio_itens (
                     periodo_id, codigo, nome, funcao, salario,
-                    proventos, descontos, adiantamento_anterior, liquido
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    proventos, descontos, adiantamento_anterior, liquido,
+                    eventos, bases, dados_adicionais
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 periodo_id,
                 emp.get("codigo", ""),
@@ -156,7 +177,10 @@ def salvar_relatorio(resumo, employees, nome_arquivo=""):
                 emp["proventos"],
                 emp["descontos"],
                 emp["adiantamento_anterior"],
-                emp["liquido"]
+                emp["liquido"],
+                eventos_json,
+                bases_json,
+                dados_adicionais_json
             ))
 
     conn.close()
@@ -287,7 +311,7 @@ def listar_periodos(empresa=None, de=None, ate=None, ano=None, preset=None):
 
 def obter_relatorio(periodo_id):
     """
-    Obtém os dados consolidados do período e a lista detalhada de funcionários.
+    Obtém os dados consolidados do período e a lista detalhada de funcionários com eventos e bases.
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -302,12 +326,42 @@ def obter_relatorio(periodo_id):
     cursor.execute("""
         SELECT 
             id, periodo_id, codigo, nome, funcao,
-            salario, proventos, descontos, adiantamento_anterior, liquido
+            salario, proventos, descontos, adiantamento_anterior, liquido,
+            eventos, bases, dados_adicionais
         FROM relatorio_itens
         WHERE periodo_id = ?
         ORDER BY nome ASC
     """, (periodo_id,))
-    itens = [dict(row) for row in cursor.fetchall()]
+    
+    itens = []
+    for row in cursor.fetchall():
+        item = dict(row)
+        if item.get("eventos"):
+            try:
+                item["eventos"] = json.loads(item["eventos"])
+            except Exception:
+                item["eventos"] = []
+        else:
+            item["eventos"] = []
+
+        if item.get("bases"):
+            try:
+                item["bases"] = json.loads(item["bases"])
+            except Exception:
+                item["bases"] = {}
+        else:
+            item["bases"] = {}
+
+        if item.get("dados_adicionais"):
+            try:
+                item["dados_adicionais"] = json.loads(item["dados_adicionais"])
+            except Exception:
+                item["dados_adicionais"] = {}
+        else:
+            item["dados_adicionais"] = {}
+
+        itens.append(item)
+
     conn.close()
 
     periodo_info["itens"] = itens
@@ -538,6 +592,25 @@ def gerar_folhas_demo_12m(empresa_alvo=None):
             desc = round(it["descontos"] * var_pct, 2)
             liq = max(0.0, round(prov - desc, 2))
 
+            # Replicar eventos proporcionalmente
+            novos_eventos = []
+            if it.get("eventos"):
+                for ev in it["eventos"]:
+                    fator_ev = 1.0 if str(ev.get("codigo")) == "12" else var_pct
+                    novos_eventos.append({
+                        "codigo": ev.get("codigo", ""),
+                        "descricao": ev.get("descricao", ""),
+                        "referencia": ev.get("referencia", ""),
+                        "valor": round(ev["valor"] * fator_ev, 2),
+                        "tipo": ev.get("tipo", "provento")
+                    })
+
+            # Replicar bases proporcionalmente
+            novas_bases = {}
+            if it.get("bases"):
+                for k, v in it["bases"].items():
+                    novas_bases[k] = round(v * var_pct, 2) if isinstance(v, (int, float)) else v
+
             novos_emps.append({
                 "codigo": it["codigo"],
                 "nome": it["nome"],
@@ -546,7 +619,10 @@ def gerar_folhas_demo_12m(empresa_alvo=None):
                 "proventos": prov,
                 "descontos": desc,
                 "adiantamento_anterior": adiant,
-                "liquido": liq
+                "liquido": liq,
+                "eventos": novos_eventos,
+                "bases": novas_bases,
+                "dados_adicionais": it.get("dados_adicionais", {})
             })
 
         resumo = {

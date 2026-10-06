@@ -46,7 +46,7 @@ Sistema desenvolvido sob medida para **extração automatizada de dados de folha
 ## 📁 Estrutura de Arquivos
 
 ```
-d:\DEV\holeritis/
+holeritis/
   ├── modelo/
   │    └── folha-agosto-2026.pdf     # Arquivo modelo fornecido
   ├── data/
@@ -56,7 +56,9 @@ d:\DEV\holeritis/
   ├── database.py                    # Camada de persistência SQLite
   ├── server.py                      # Servidor Web & API RESTful (porta 8050)
   ├── seed.py                        # Script de pré-carga da folha modelo
-  ├── run.bat                        # Script de inicialização em 1 clique
+  ├── requirements.txt               # Dependências do projeto (pdfplumber)
+  ├── run.sh                         # Script de inicialização automática (macOS / Linux)
+  ├── run.bat                        # Script de inicialização em 1 clique (Windows)
   ├── static/                        # Frontend da aplicação
   │    ├── index.html
   │    ├── style.css
@@ -68,11 +70,64 @@ d:\DEV\holeritis/
 
 ## ⚡ Como Executar
 
-### Opção 1: Via script de 1 clique
-Basta dar duplo clique no arquivo `run.bat`. O servidor será iniciado e abrirá automaticamente o navegador em `http://localhost:8050`.
+### 🍎 No macOS (e Linux)
 
-### Opção 2: Via terminal
+#### 1. Pré-requisitos
+Certifique-se de ter o **Python 3.8+** instalado. Para verificar, abra o Terminal e execute:
 ```bash
+python3 --version
+```
+> Caso não tenha o Python instalado, você pode instalá-lo via Homebrew: `brew install python`.
+
+#### 2. Configurar o Ambiente Virtual e Dependências
+No macOS (especialmente com Homebrew ou versões modernas do Python), é recomendado utilizar um ambiente virtual:
+
+```bash
+# 1. Entre na pasta do projeto (caso ainda não esteja nela)
+cd holeritis-main
+
+# 2. Crie o ambiente virtual
+python3 -m venv venv
+
+# 3. Ative o ambiente virtual
+source venv/bin/activate
+
+# 4. Instale as dependências
+pip install -r requirements.txt
+```
+
+#### 3. (Opcional) Carregar Folha de Teste / Demonstração
+Se quiser popular o banco com a folha de exemplo fornecida:
+```bash
+python3 seed.py
+```
+
+#### 4. Iniciar a Aplicação
+
+- **Opção A: Via script de inicialização rápida (`run.sh`)**
+  ```bash
+  ./run.sh
+  ```
+  *(Ele detecta o ambiente virtual automaticamente, inicia o servidor e abre a página no seu navegador)*.
+
+- **Opção B: Diretamente pelo terminal**
+  ```bash
+  python3 server.py 8050
+  ```
+  Em seguida, acesse no navegador: [http://localhost:8050](http://localhost:8050).
+
+---
+
+### 🪟 No Windows
+
+#### Opção 1: Via script de 1 clique
+1. Certifique-se de ter o Python instalado e o pacote `pdfplumber` (`pip install -r requirements.txt`).
+2. Dê duplo clique no arquivo `run.bat`. O servidor será iniciado e abrirá automaticamente o navegador em `http://localhost:8050`.
+
+#### Opção 2: Via terminal (Prompt de Comando ou PowerShell)
+```bash
+pip install -r requirements.txt
 python server.py 8050
 ```
-Em seguida, acesse no navegador: `http://localhost:8050`
+Em seguida, acesse no navegador: [http://localhost:8050](http://localhost:8050).
+

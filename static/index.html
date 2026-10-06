@@ -1,22 +1,26 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistema de Relatórios de Folha de Pagamento & Holerites</title>
-  
+
   <!-- Fontes Google -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+
   <!-- Biblioteca SheetJS para exportação Excel -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Chart.js para visualizações gráficas -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
+
 <body class="theme-dark">
   <!-- Notificações Toast -->
   <div id="toast-container" class="toast-container"></div>
@@ -26,7 +30,8 @@
     <div class="header-container">
       <div class="brand">
         <div class="brand-logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
             <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -59,7 +64,7 @@
 
   <!-- Container Principal -->
   <main class="main-content">
-    
+
     <!-- Modal / Seção de Upload de Arquivo -->
     <section id="upload-panel" class="upload-panel hidden">
       <div class="card upload-card">
@@ -181,10 +186,12 @@
 
           <!-- Ações do Filtro -->
           <div class="filter-actions-group">
-            <button id="btn-apply-date-filter" class="btn btn-secondary btn-sm" type="button" title="Aplicar filtros de intervalo">
+            <button id="btn-apply-date-filter" class="btn btn-secondary btn-sm" type="button"
+              title="Aplicar filtros de intervalo">
               Filtrar
             </button>
-            <button id="btn-clear-date-filter" class="btn btn-ghost btn-sm hidden" type="button" title="Limpar filtros aplicados">
+            <button id="btn-clear-date-filter" class="btn btn-ghost btn-sm hidden" type="button"
+              title="Limpar filtros aplicados">
               ✕ Limpar
             </button>
           </div>
@@ -193,7 +200,8 @@
         <!-- Indicador de Status dos Filtros e Botão de Acesso Rápido a Gráficos 12M -->
         <div class="filter-meta-group">
           <span id="period-filter-badge" class="badge badge-info">8 Períodos</span>
-          <button id="btn-quick-12m" class="btn btn-primary btn-sm btn-12m-highlight" type="button" title="Abrir comparativo de 12 meses">
+          <button id="btn-quick-12m" class="btn btn-primary btn-sm btn-12m-highlight" type="button"
+            title="Abrir comparativo de 12 meses">
             📈 Ver Gráficos 12M
           </button>
         </div>
@@ -205,9 +213,12 @@
       <div class="section-header-compact">
         <div class="period-title-wrap">
           <span class="badge badge-info">Folhas e Períodos</span>
-          <span id="period-context-hint" class="helper-text">Classificação automática por Razão Social e competência • Arraste para reordenar</span>
-          <button id="btn-reset-order" class="btn-reset-order hidden" title="Restaurar ordem original (mais recentes primeiro)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <span id="period-context-hint" class="helper-text">Classificação automática por Razão Social e competência •
+            Arraste para reordenar</span>
+          <button id="btn-reset-order" class="btn-reset-order hidden"
+            title="Restaurar ordem original (mais recentes primeiro)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
               <path d="M3 3v5h5"></path>
             </svg>
@@ -225,7 +236,7 @@
 
     <!-- Relatório Ativo -->
     <div id="report-view" class="report-view">
-      
+
       <!-- Detalhes do Período Selecionado -->
       <section class="period-summary-banner">
         <div class="banner-info">
@@ -248,7 +259,7 @@
             </svg>
             <span id="chart-toggle-text">Ver Gráficos</span>
           </button>
-          
+
           <button id="btn-export-excel" class="btn btn-secondary" title="Exportar para Excel (.xlsx)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -361,7 +372,7 @@
 
         <!-- Grupo 1: Gráfico e Indicadores de Evolução de 12 Meses (Destaque Principal) -->
         <div id="charts-12m-view" class="charts-12m-view">
-          
+
           <!-- Controles do Gráfico de 12 Meses -->
           <div class="card chart-12m-header-card">
             <div class="chart-12m-meta">
@@ -370,7 +381,8 @@
                 <h4>Comparação de 12 Meses: Proventos x Adiantamento Anterior x Líquido</h4>
               </div>
               <p class="chart-subtitle">
-                Análise direta entre Remuneração Bruta, Adiantamentos Compensados e Salário Líquido Depositado por competência
+                Análise direta entre Remuneração Bruta, Adiantamentos Compensados e Salário Líquido Depositado por
+                competência
               </p>
             </div>
 
@@ -378,13 +390,16 @@
               <!-- Seletor de Tipo de Gráfico -->
               <div class="chart-btn-group">
                 <span class="toolbar-label">Tipo:</span>
-                <button id="btn-chart-type-bar" class="btn-chart-opt active" type="button" title="Barras agrupadas lado a lado">
+                <button id="btn-chart-type-bar" class="btn-chart-opt active" type="button"
+                  title="Barras agrupadas lado a lado">
                   📊 Barras
                 </button>
-                <button id="btn-chart-type-line" class="btn-chart-opt" type="button" title="Linhas de tendência e áreas">
+                <button id="btn-chart-type-line" class="btn-chart-opt" type="button"
+                  title="Linhas de tendência e áreas">
                   📈 Linhas
                 </button>
-                <button id="btn-chart-type-stacked" class="btn-chart-opt" type="button" title="Barras empilhadas de composição">
+                <button id="btn-chart-type-stacked" class="btn-chart-opt" type="button"
+                  title="Barras empilhadas de composição">
                   🧱 Empilhado
                 </button>
               </div>
@@ -398,7 +413,8 @@
               </div>
 
               <!-- Botão Opcional para Demonstração de 12 Meses Contínuos -->
-              <button id="btn-seed-12m" class="btn btn-ghost btn-sm" type="button" title="Completar 12 meses para teste">
+              <button id="btn-seed-12m" class="btn btn-ghost btn-sm" type="button"
+                title="Completar 12 meses para teste">
                 ✨ Demo 12M
               </button>
             </div>
@@ -448,7 +464,8 @@
             <div class="chart-header">
               <div class="chart-header-left">
                 <h4>Trajetória Comparativa Mensal</h4>
-                <span class="chart-subtitle">Proventos Brutos (Azul) vs Adiantamento Anterior (Âmbar) vs Total Líquido (Verde)</span>
+                <span class="chart-subtitle">Proventos Brutos (Azul) vs Adiantamento Anterior (Âmbar) vs Total Líquido
+                  (Verde)</span>
               </div>
               <div class="chart-legend-custom">
                 <span class="legend-dot dot-prov"></span> Proventos
@@ -522,7 +539,8 @@
           <div class="card chart-card chart-full-col">
             <div class="chart-header">
               <h4>Evolução de Colaboradores (Headcount) & Média Salarial</h4>
-              <span class="chart-subtitle">Variação da quantidade de funcionários e salário base contratual médio ao longo do tempo</span>
+              <span class="chart-subtitle">Variação da quantidade de funcionários e salário base contratual médio ao
+                longo do tempo</span>
             </div>
             <div class="chart-wrapper chart-wrapper-large">
               <canvas id="canvas-evolucao-headcount"></canvas>
@@ -533,7 +551,7 @@
 
       <!-- Tabela Principal de Relatório -->
       <section class="card table-card">
-        
+
         <!-- Barra de Filtros e Busca -->
         <div class="table-controls">
           <div class="search-box">
@@ -614,72 +632,143 @@
     <div id="empty-state" class="empty-state hidden">
       <div class="empty-icon">📁</div>
       <h3>Nenhum relatório de folha cadastrado ainda</h3>
-      <p>Envie o primeiro arquivo PDF de folha de pagamento para extrair os dados e começar a visualização dos relatórios classificados por período.</p>
+      <p>Envie o primeiro arquivo PDF de folha de pagamento para extrair os dados e começar a visualização dos
+        relatórios classificados por período.</p>
       <button id="btn-empty-upload" class="btn btn-primary">Fazer Upload de Folha em PDF</button>
     </div>
 
   </main>
 
-  <!-- Modal de Detalhes / Espelho de Holerite Individual -->
+  <!-- Modal de Detalhes / Espelho de Holerite Individual Detalhado -->
   <div id="modal-holerite" class="modal-overlay hidden" role="dialog" aria-modal="true">
-    <div class="modal-card holerite-modal-card">
+    <div class="modal-card holerite-modal-card holerite-modal-expanded">
       <div class="modal-header">
         <div class="holerite-header-brand">
           <div class="holerite-badge-group">
             <span class="badge badge-competencia" id="modal-comp-badge">--/----</span>
-            <span class="badge badge-info">Espelho de Holerite</span>
+            <span class="badge badge-info">Recibo de Pagamento de Salário</span>
           </div>
           <h3 id="modal-empresa-nome">EMPRESA</h3>
           <p id="modal-empresa-cnpj" class="modal-empresa-cnpj">CNPJ: --</p>
         </div>
         <button id="btn-close-modal" class="btn-close" aria-label="Fechar">&times;</button>
       </div>
-      
-      <div class="modal-body">
+
+      <div class="modal-body modal-body-scroll">
+        <!-- Ficha Resumida do Colaborador -->
         <div class="holerite-employee-card">
           <div class="emp-avatar-placeholder">👤</div>
           <div class="emp-card-details">
-            <h4 id="modal-emp-nome">NOME DO COLABORADOR</h4>
+            <div class="emp-card-header-row">
+              <h4 id="modal-emp-nome">NOME DO COLABORADOR</h4>
+              <span id="modal-emp-salario-base-badge" class="badge-salario-tag">Salário Base: <strong id="modal-salario-top">R$ 0,00</strong></span>
+            </div>
             <div class="emp-meta-tags">
               <span id="modal-emp-codigo" class="meta-tag">Cód: --</span>
               <span id="modal-emp-funcao" class="meta-tag">Cargo: --</span>
+              <span id="modal-emp-admissao" class="meta-tag">Admissão: --</span>
+              <span id="modal-emp-situacao" class="meta-tag">Situação: --</span>
+              <span id="modal-emp-dep-ir" class="meta-tag">Dep. IR: 0</span>
             </div>
-            <p id="modal-emp-periodo" class="emp-period-range">Período de: -- a --</p>
+            <p id="modal-emp-periodo" class="emp-period-range">Período de Apuração: -- a --</p>
           </div>
         </div>
 
-        <div class="holerite-breakdown">
-          <div class="breakdown-item">
-            <span class="breakdown-label">Salário Base Contratual</span>
-            <span id="modal-salario" class="breakdown-val font-mono">R$ 0,00</span>
+        <!-- Tabela Detalhada de Rubricas / Eventos (Créditos / Proventos e Débitos / Descontos) -->
+        <div class="holerite-section">
+          <div class="holerite-section-header">
+            <h5>📋 Demonstrativo de Eventos da Folha (Créditos e Débitos)</h5>
+            <span class="section-badge-counter" id="modal-eventos-count">0 rubricas</span>
           </div>
-          <div class="breakdown-item bg-highlight-prov">
-            <div class="breakdown-label-wrap">
-              <span class="breakdown-label text-bold">Total de Proventos (Bruto)</span>
-              <span class="breakdown-hint">Remuneração total do período</span>
-            </div>
-            <span id="modal-proventos" class="breakdown-val font-mono text-primary text-bold">R$ 0,00</span>
+
+          <div class="table-container holerite-table-wrapper">
+            <table class="data-table holerite-events-table">
+              <thead>
+                <tr>
+                  <th class="col-cod text-center">Cód</th>
+                  <th class="col-desc">Descrição da Rubrica</th>
+                  <th class="col-ref text-center">Referência</th>
+                  <th class="col-prov text-right">Crédito / Proventos (R$)</th>
+                  <th class="col-desc-val text-right">Débito / Descontos (R$)</th>
+                </tr>
+              </thead>
+              <tbody id="modal-eventos-tbody">
+                <!-- Linhas inseridas dinamicamente via JS -->
+              </tbody>
+              <tfoot>
+                <tr class="row-totais-eventos">
+                  <td colspan="3" class="text-right text-bold">TOTAIS CONSOLIDADOS:</td>
+                  <td class="text-right font-mono text-bold text-primary" id="modal-table-total-proventos">R$ 0,00</td>
+                  <td class="text-right font-mono text-bold text-danger" id="modal-table-total-descontos">R$ 0,00</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
-          <div class="breakdown-item bg-highlight-adv">
-            <div class="breakdown-label-wrap">
-              <span class="breakdown-label">(-) Adiantamento Anterior</span>
-              <span class="breakdown-hint">Compensação de antecipação</span>
-            </div>
-            <span id="modal-adiantamento" class="breakdown-val font-mono text-amber text-bold">R$ 0,00</span>
+        </div>
+
+        <!-- Resumo Financeiro em Destaque -->
+        <div class="holerite-summary-bar">
+          <div class="summary-box proventos-box">
+            <span class="summary-label">Total Proventos (Créditos)</span>
+            <span class="summary-value font-mono" id="modal-proventos">R$ 0,00</span>
           </div>
-          <div class="breakdown-item bg-highlight-desc">
-            <div class="breakdown-label-wrap">
-              <span class="breakdown-label">(-) Total de Descontos</span>
-              <span class="breakdown-hint">INSS, IRRF e outras retenções</span>
-            </div>
-            <span id="modal-descontos" class="breakdown-val font-mono text-danger text-bold">R$ 0,00</span>
+          <div class="summary-box adiantamento-box">
+            <span class="summary-label">Adiantamento Anterior</span>
+            <span class="summary-value font-mono" id="modal-adiantamento">R$ 0,00</span>
           </div>
-          <div class="breakdown-item bg-highlight-liq total-item">
-            <div class="breakdown-label-wrap">
-              <span class="breakdown-label text-bold">VALOR LÍQUIDO A RECEBER</span>
-              <span class="breakdown-hint">Valor efetivo creditado ao funcionário</span>
+          <div class="summary-box descontos-box">
+            <span class="summary-label">Total Descontos (Débitos)</span>
+            <span class="summary-value font-mono" id="modal-descontos">R$ 0,00</span>
+          </div>
+          <div class="summary-box liquido-box">
+            <span class="summary-label">VALOR LÍQUIDO A RECEBER</span>
+            <span class="summary-value font-mono" id="modal-liquido">R$ 0,00</span>
+          </div>
+        </div>
+
+        <!-- Quadro de Bases de Cálculo e Encargos Legais -->
+        <div class="holerite-section bases-section">
+          <div class="holerite-section-header">
+            <h5>🏛️ Bases de Cálculo e Recolhimentos Sociais</h5>
+            <span class="bases-hint-text">Valores oficiais para apuração de INSS, FGTS e IRRF</span>
+          </div>
+
+          <div class="bases-grid">
+            <div class="base-card">
+              <span class="base-card-label">Salário Base</span>
+              <span class="base-card-val font-mono" id="modal-salario">R$ 0,00</span>
             </div>
-            <span id="modal-liquido" class="breakdown-val font-mono text-success text-bold total-val">R$ 0,00</span>
+            <div class="base-card">
+              <span class="base-card-label">Base INSS Empresa</span>
+              <span class="base-card-val font-mono" id="modal-base-inss-empresa">R$ 0,00</span>
+            </div>
+            <div class="base-card">
+              <span class="base-card-label">Base INSS Funcionário</span>
+              <span class="base-card-val font-mono" id="modal-base-inss-func">R$ 0,00</span>
+            </div>
+            <div class="base-card">
+              <span class="base-card-label">Base INSS Func. 13º</span>
+              <span class="base-card-val font-mono" id="modal-base-inss-13">R$ 0,00</span>
+            </div>
+            <div class="base-card">
+              <span class="base-card-label">Base F.G.T.S.</span>
+              <span class="base-card-val font-mono" id="modal-base-fgts">R$ 0,00</span>
+            </div>
+            <div class="base-card">
+              <span class="base-card-label">Base F.G.T.S. 13º</span>
+              <span class="base-card-val font-mono" id="modal-base-fgts-13">R$ 0,00</span>
+            </div>
+            <div class="base-card highlight-fgts">
+              <span class="base-card-label">F.G.T.S. do Mês (8%)</span>
+              <span class="base-card-val font-mono" id="modal-valor-fgts">R$ 0,00</span>
+            </div>
+            <div class="base-card">
+              <span class="base-card-label">Base I.R.R.F.</span>
+              <span class="base-card-val font-mono" id="modal-base-irrf">R$ 0,00</span>
+            </div>
+          </div>
+          <div class="bases-footer-meta">
+            <span>Deduções Legais de IRRF (Dependentes / INSS): <strong id="modal-deducoes-irrf" class="font-mono">R$ 0,00</strong></span>
           </div>
         </div>
       </div>
@@ -725,6 +814,7 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
+
 </html>
