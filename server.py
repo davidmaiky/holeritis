@@ -855,7 +855,6 @@ def start_server(host=None, port=None):
     print(f"\n========================================================")
     print(f"  SISTEMA DE GESTÃO DE FOLHA E HOLERITES INICIADO")
     print(f"  Servidor ativo em: http://{host}:{port}")
-    print(f"  Acesso padrão: admin / admin")
     print(f"========================================================\n")
     try:
         httpd.serve_forever()
