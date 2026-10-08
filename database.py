@@ -73,6 +73,10 @@ def init_db():
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_itens_periodo ON relatorio_itens(periodo_id);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_periodos_mes_ano ON periodos(mes_ano);")
+        
+        # Inicialização do módulo de autenticação e usuários
+        import auth
+        auth.init_auth_db(conn)
     conn.close()
 
 def salvar_relatorio(resumo, employees, nome_arquivo=""):

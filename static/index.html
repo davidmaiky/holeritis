@@ -20,12 +20,101 @@
   <!-- Chart.js para visualizações gráficas -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 
 <body class="theme-dark">
   <!-- Notificações Toast -->
   <div id="toast-container" class="toast-container"></div>
+
+  <!-- Tela / Overlay de Login Corporativo com Design Moderno -->
+  <div id="auth-overlay" class="auth-overlay hidden">
+    <div class="auth-backdrop-decorations">
+      <div class="decor-circle decor-1"></div>
+      <div class="decor-circle decor-2"></div>
+      <div class="decor-grid"></div>
+    </div>
+    <div class="auth-card">
+      <div class="auth-card-header">
+        <div class="auth-brand-logo">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="10" y1="9" x2="8" y2="9"></line>
+          </svg>
+        </div>
+        <h2>Holerite<span>Manager</span></h2>
+        <p class="auth-subtitle">Acesso Seguro à Gestão e Inteligência de Folhas de Pagamento</p>
+      </div>
+
+      <div id="login-error-alert" class="alert-auth-error hidden">
+        <span class="alert-auth-icon">⚠️</span>
+        <span id="login-error-text">Credenciais inválidas. Verifique usuário e senha.</span>
+      </div>
+
+      <form id="form-login" class="auth-form" action="javascript:void(0);" onsubmit="return false;" autocomplete="on">
+        <div class="form-group-auth">
+          <label for="login-username" class="form-label">Nome de Usuário</label>
+          <div class="input-icon-wrap">
+            <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <input type="text" id="login-username" class="form-control-auth" placeholder="ex: admin" required autocomplete="username" spellcheck="false">
+          </div>
+        </div>
+
+        <div class="form-group-auth">
+          <div class="form-label-row">
+            <label for="login-password" class="form-label">Senha de Acesso</label>
+          </div>
+          <div class="input-icon-wrap">
+            <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <input type="password" id="login-password" class="form-control-auth" placeholder="Digite sua senha" required autocomplete="current-password">
+            <button type="button" id="btn-toggle-login-pwd" class="btn-pwd-toggle" title="Alternar visibilidade da senha" tabindex="-1">
+              <svg id="eye-open-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              <svg id="eye-closed-icon" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="auth-options-row">
+          <label class="remember-checkbox-label">
+            <input type="checkbox" id="login-remember" checked>
+            <span>Manter sessão ativa neste dispositivo</span>
+          </label>
+        </div>
+
+        <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block btn-login-submit">
+          <span class="btn-text">Entrar no Sistema</span>
+          <div class="spinner btn-spinner hidden" id="login-spinner"></div>
+        </button>
+      </form>
+
+      <!-- Dica Rápida de Demonstração / Acesso Padrão -->
+      <div class="auth-demo-hint">
+        <div class="demo-hint-content">
+          <div class="demo-hint-header">
+            <span class="demo-badge">Acesso Padrão</span>
+            <span class="demo-title">Administrador Inicial</span>
+          </div>
+          <div class="demo-credentials">
+            <span>Usuário: <strong>admin</strong></span>
+            <span class="divider">•</span>
+            <span>Senha: <strong>admin</strong></span>
+          </div>
+          <button type="button" id="btn-fill-demo-login" class="btn-link-demo">
+            Preencher Automaticamente
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Topbar Corporativa -->
   <header class="app-header">
@@ -52,7 +141,7 @@
           <span class="theme-icon light-icon">☀️</span>
           <span class="theme-icon dark-icon">🌙</span>
         </button>
-        <button id="btn-open-upload" class="btn btn-primary">
+        <button id="btn-open-upload" class="btn btn-primary" title="Importar nova folha de pagamento em formato PDF">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="17 8 12 3 7 8"></polyline>
@@ -60,6 +149,46 @@
           </svg>
           Importar Novo PDF
         </button>
+
+        <!-- Menu do Usuário Logado -->
+        <div class="user-menu-wrap" id="user-menu-wrap">
+          <button id="btn-user-profile-menu" class="btn-user-pill" aria-expanded="false" title="Menu da conta">
+            <span id="user-avatar-initials" class="user-avatar-badge">AD</span>
+            <span class="user-meta-text">
+              <span id="user-display-name" class="user-name-label">Administrador</span>
+              <span id="user-role-badge" class="badge-role-pill badge-role-admin">Admin</span>
+            </span>
+            <svg class="chevron-user-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+
+          <div id="user-dropdown-menu" class="user-dropdown-card hidden">
+            <div class="user-dropdown-info">
+              <div class="user-dropdown-avatar" id="dropdown-avatar-large">AD</div>
+              <div class="user-dropdown-details">
+                <strong id="dropdown-user-name">Administrador do Sistema</strong>
+                <span id="dropdown-user-email">admin@holeritemanager.local</span>
+                <span id="dropdown-user-cargo" class="dropdown-cargo-tag">Administrador Geral</span>
+              </div>
+            </div>
+            <div class="user-dropdown-divider"></div>
+            <button type="button" id="btn-open-perfil" class="user-dropdown-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <span>Meu Perfil & Senha</span>
+            </button>
+            <button type="button" id="btn-open-usuarios" class="user-dropdown-btn admin-only">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              <span>Gerenciar Usuários</span>
+              <span class="badge-admin-tag">Admin</span>
+            </button>
+            <div class="user-dropdown-divider"></div>
+            <button type="button" id="btn-logout" class="user-dropdown-btn user-dropdown-btn-danger">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+              <span>Sair do Sistema</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -799,7 +928,278 @@
     </div>
   </div>
 
-  <!-- Cabeçalho Exclusivo de Impressão -->
+  <!-- ========================================================
+       MODAL: GERENCIAMENTO DE USUÁRIOS E ACESSOS (ADMIN)
+       ======================================================== -->
+  <div id="modal-usuarios" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-users-title">
+    <div class="modal-card users-modal-card">
+      <div class="modal-header">
+        <div class="modal-header-info">
+          <div class="modal-header-icon-box">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 id="modal-users-title" class="modal-title">Gestão de Usuários & Controle de Acessos</h3>
+            <p class="modal-subtitle">Controle de colaboradores, concessão de perfis e auditoria de acessos</p>
+          </div>
+        </div>
+        <button id="btn-close-modal-usuarios" class="btn-close" aria-label="Fechar">&times;</button>
+      </div>
+
+      <div class="modal-body-scroll users-modal-body">
+        <!-- Métricas Rápidas de Usuários -->
+        <div class="users-stats-grid">
+          <div class="user-stat-card">
+            <div class="stat-icon stat-icon-blue">👥</div>
+            <div class="stat-text">
+              <span class="stat-number" id="kpi-users-total">0</span>
+              <span class="stat-label">Total Cadastrados</span>
+            </div>
+          </div>
+          <div class="user-stat-card">
+            <div class="stat-icon stat-icon-purple">🛡️</div>
+            <div class="stat-text">
+              <span class="stat-number" id="kpi-users-admins">0</span>
+              <span class="stat-label">Administradores</span>
+            </div>
+          </div>
+          <div class="user-stat-card">
+            <div class="stat-icon stat-icon-cyan">👔</div>
+            <div class="stat-text">
+              <span class="stat-number" id="kpi-users-operadores">0</span>
+              <span class="stat-label">Operadores / RH</span>
+            </div>
+          </div>
+          <div class="user-stat-card">
+            <div class="stat-icon stat-icon-green">✅</div>
+            <div class="stat-text">
+              <span class="stat-number" id="kpi-users-ativos">0</span>
+              <span class="stat-label">Usuários Ativos</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Ações e Filtro -->
+        <div class="users-action-bar">
+          <div class="users-search-wrap">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="search-usuarios" class="form-control-search" placeholder="Pesquisar por nome, usuário, cargo ou e-mail...">
+          </div>
+
+          <div class="users-filter-group">
+            <select id="filter-user-role" class="form-select user-role-filter">
+              <option value="all">Todos os Perfis</option>
+              <option value="admin">Apenas Administradores</option>
+              <option value="operador">Apenas Operadores</option>
+            </select>
+
+            <button type="button" id="btn-novo-usuario" class="btn btn-primary btn-novo-user">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Novo Usuário
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabela de Usuários -->
+        <div class="table-responsive users-table-container">
+          <table class="data-table users-table">
+            <thead>
+              <tr>
+                <th style="width: 28%;">Colaborador / Usuário</th>
+                <th style="width: 25%;">Função / E-mail</th>
+                <th style="width: 14%; text-align: center;">Nível de Acesso</th>
+                <th style="width: 11%; text-align: center;">Status</th>
+                <th style="width: 12%; text-align: center;">Último Acesso</th>
+                <th style="width: 10%; text-align: center;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="users-table-body">
+              <tr>
+                <td colspan="6" class="text-center text-muted" style="padding: 30px;">Carregando usuários...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-close-modal-usuarios-bottom" class="btn btn-secondary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: FORMULÁRIO DE USUÁRIO (CRIAR / EDITAR)
+       ======================================================== -->
+  <div id="modal-form-usuario" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="user-form-modal-title">
+    <div class="modal-card user-form-modal-card">
+      <div class="modal-header">
+        <h3 id="user-form-modal-title" class="modal-title">Novo Usuário do Sistema</h3>
+        <button id="btn-close-form-usuario" class="btn-close" aria-label="Fechar">&times;</button>
+      </div>
+
+      <form id="form-usuario" class="user-modal-form" action="javascript:void(0);" onsubmit="return false;">
+        <input type="hidden" id="form-user-id" value="">
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="form-user-nome" class="form-label">Nome Completo *</label>
+            <input type="text" id="form-user-nome" class="form-control" placeholder="ex: Maria Silva Santos" required>
+          </div>
+
+          <div class="form-group">
+            <label for="form-user-username" class="form-label">Nome de Usuário (Login) *</label>
+            <input type="text" id="form-user-username" class="form-control font-mono" placeholder="ex: maria.silva" required autocomplete="off">
+            <small class="form-hint" id="form-username-hint">Utilizado para efetuar o login no sistema.</small>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="form-user-email" class="form-label">E-mail Corporativo</label>
+            <input type="email" id="form-user-email" class="form-control" placeholder="ex: maria@empresa.com.br">
+          </div>
+
+          <div class="form-group">
+            <label for="form-user-cargo" class="form-label">Cargo / Departamento</label>
+            <input type="text" id="form-user-cargo" class="form-control" placeholder="ex: Analista de Departamento Pessoal">
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="form-user-role" class="form-label">Nível de Permissão *</label>
+            <select id="form-user-role" class="form-select" required>
+              <option value="operador">Operador (Consulta relatórios, aplica filtros e exporta)</option>
+              <option value="admin">Administrador (Acesso total, gestão de usuários e upload)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="form-user-ativo" class="form-label">Status da Conta *</label>
+            <select id="form-user-ativo" class="form-select" required>
+              <option value="1">Ativo (Acesso Liberado)</option>
+              <option value="0">Inativo (Acesso Bloqueado)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-divider">
+          <span>Segurança & Senha de Acesso</span>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="form-user-senha" class="form-label" id="label-user-senha">Senha de Acesso *</label>
+            <input type="password" id="form-user-senha" class="form-control" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+            <small class="form-hint" id="form-senha-hint">Mínimo de 4 caracteres.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="form-user-confirma-senha" class="form-label">Confirmação de Senha</label>
+            <input type="password" id="form-user-confirma-senha" class="form-control" placeholder="Repita a senha digitada" autocomplete="new-password">
+          </div>
+        </div>
+
+        <div id="form-user-error" class="alert-form-error hidden"></div>
+
+        <div class="modal-footer form-footer">
+          <button type="button" id="btn-cancelar-form-usuario" class="btn btn-secondary">Cancelar</button>
+          <button type="submit" id="btn-salvar-usuario" class="btn btn-primary">
+            <span class="btn-text">Salvar Usuário</span>
+            <div class="spinner btn-spinner hidden" id="spinner-salvar-user"></div>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: MEU PERFIL & ALTERAR SENHA (USUÁRIO ATUAL)
+       ======================================================== -->
+  <div id="modal-perfil" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="perfil-modal-title">
+    <div class="modal-card perfil-modal-card">
+      <div class="modal-header">
+        <div class="modal-header-info">
+          <div class="modal-header-icon-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <div>
+            <h3 id="perfil-modal-title" class="modal-title">Meu Perfil de Acesso</h3>
+            <p class="modal-subtitle">Atualize suas informações cadastrais e senha pessoal</p>
+          </div>
+        </div>
+        <button id="btn-close-modal-perfil" class="btn-close" aria-label="Fechar">&times;</button>
+      </div>
+
+      <form id="form-meu-perfil" class="perfil-modal-form" action="javascript:void(0);" onsubmit="return false;">
+        <div class="perfil-info-banner">
+          <div class="perfil-avatar-preview" id="perfil-avatar-preview">AD</div>
+          <div class="perfil-banner-text">
+            <strong id="perfil-banner-username">@admin</strong>
+            <div class="perfil-pills-row">
+              <span id="perfil-banner-role" class="badge-role-pill badge-role-admin">Administrador</span>
+              <span id="perfil-banner-cargo" class="badge-cargo-pill">Administrador Geral</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="perfil-input-nome" class="form-label">Nome Completo</label>
+          <input type="text" id="perfil-input-nome" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label for="perfil-input-email" class="form-label">E-mail Cadastrado</label>
+          <input type="email" id="perfil-input-email" class="form-control" placeholder="seuemail@empresa.com.br">
+        </div>
+
+        <div class="form-divider">
+          <span>Alterar Minha Senha (Opcional)</span>
+        </div>
+
+        <div class="form-group">
+          <label for="perfil-senha-atual" class="form-label">Senha Atual</label>
+          <input type="password" id="perfil-senha-atual" class="form-control" placeholder="Necessária apenas para alterar a senha" autocomplete="current-password">
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="perfil-nova-senha" class="form-label">Nova Senha</label>
+            <input type="password" id="perfil-nova-senha" class="form-control" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="perfil-confirma-senha" class="form-label">Confirmar Nova Senha</label>
+            <input type="password" id="perfil-confirma-senha" class="form-control" placeholder="Repita a nova senha" autocomplete="new-password">
+          </div>
+        </div>
+
+        <div id="perfil-error-alert" class="alert-form-error hidden"></div>
+
+        <div class="modal-footer form-footer">
+          <button type="button" id="btn-cancelar-perfil" class="btn btn-secondary">Cancelar</button>
+          <button type="submit" id="btn-salvar-perfil" class="btn btn-primary">
+            <span class="btn-text">Salvar Alterações</span>
+            <div class="spinner btn-spinner hidden" id="spinner-salvar-perfil"></div>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
   <div id="print-header" class="print-only">
     <div class="print-brand">
       <h2>RELATÓRIO DE FOLHA DE PAGAMENTO & HOLERITES</h2>
@@ -826,7 +1226,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 
 </html>

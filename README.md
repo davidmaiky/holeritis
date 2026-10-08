@@ -32,6 +32,16 @@ Sistema desenvolvido sob medida para **extração automatizada de dados de folha
    - **CSV**: Download direto em UTF-8 com BOM compatível com Excel.
    - **Impressão / PDF A4 Otimizada**: Cabeçalho de impressão com dados corporativos, repetição de `<thead>` entre páginas, quebra limpa de linhas sem cortar colaboradores ao meio, rodapé com data/hora e campos de assinatura para RH e Contabilidade.
 
+5. **Autenticação Segura & Gestão de Usuários (RBAC)**:
+   - **Tela de Login Executiva**: Interface moderna com proteção de rotas e preenchimento de credenciais de demonstração com um clique.
+   - **Criptografia Forte (Zero Dependências Externas)**: Hashing com algoritmo **PBKDF2-HMAC-SHA256**, 100.000 iterações e salt criptográfico individual via biblioteca padrão `hashlib` e `secrets`.
+   - **Sessões Persistentes**: Gerenciamento de tokens via banco SQLite com cookies e suporte a headers `Authorization: Bearer <token>`.
+   - **Controle de Acesso por Papel (RBAC)**:
+     - **Administrador (`admin`)**: Controle de usuários (criação, edição, bloqueio, reset de senha e exclusão), envio de relatórios em PDF e exclusão de períodos.
+     - **Operador (`operador`)**: Consulta de relatórios, filtros, espelhos de holerite e exportações.
+   - **Meu Perfil**: Autoatendimento para alteração de nome, e-mail e troca de senha pessoal.
+   - **Acesso Inicial Padrão**: Usuário `admin` | Senha `admin`.
+
 ---
 
 ## 🛠️ Tecnologias Utilizadas
@@ -54,8 +64,10 @@ holeritis/
   ├── uploads/                       # Armazenamento temporário de PDFs enviados
   ├── parser.py                      # Mecanismo de extração regex & layout do PDF
   ├── database.py                    # Camada de persistência SQLite
+  ├── auth.py                        # Módulo de Autenticação, Senhas e Gestão de Usuários
   ├── server.py                      # Servidor Web & API RESTful (porta 8050)
   ├── seed.py                        # Script de pré-carga da folha modelo
+  ├── test_auth_api.py               # Testes automatizados de autenticação e RBAC
   ├── requirements.txt               # Dependências do projeto (pdfplumber)
   ├── run.sh                         # Script de inicialização automática (macOS / Linux)
   ├── run.bat                        # Script de inicialização em 1 clique (Windows)

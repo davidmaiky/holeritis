@@ -1,10 +1,15 @@
 /**
  * Lógica do Sistema de Gestão de Folha de Pagamento & Holerites
- * Responsável por: Comunicação com a API, Uploads, Filtros, Gráficos e Exportações.
+ * Responsável por: Autenticação, Gestão de Usuários, Uploads, Filtros, Gráficos e Exportações.
  */
 
 // Estado Global da Aplicação
 const state = {
+  // Autenticação e Usuários
+  token: localStorage.getItem("holerite_auth_token") || "",
+  currentUser: null,
+  usersList: [],
+
   empresas: [],
   selectedEmpresa: "", // "" = todas as empresas
   periodos: [],
@@ -38,6 +43,34 @@ const state = {
   chartTopSalarios: null,
   chartEvolucaoHeadcount: null,
   currentModalEmployee: null
+};
+
+// Interceptor Global de Fetch para envio de Token e Detecção de 401
+const _nativeFetch = window.fetch;
+window.fetch = async function(resource, init) {
+  init = init || {};
+  init.headers = init.headers || {};
+  if (state.token) {
+    if (init.headers instanceof Headers) {
+      if (!init.headers.has("Authorization")) {
+        init.headers.set("Authorization", `Bearer ${state.token}`);
+      }
+    } else if (Array.isArray(init.headers)) {
+      init.headers.push(["Authorization", `Bearer ${state.token}`]);
+    } else {
+      if (!init.headers["Authorization"]) {
+        init.headers["Authorization"] = `Bearer ${state.token}`;
+      }
+    }
+  }
+  const response = await _nativeFetch(resource, init);
+  if (response.status === 401) {
+    const urlStr = typeof resource === "string" ? resource : (resource.url || "");
+    if (!urlStr.includes("/api/auth/login") && !urlStr.includes("/api/auth/me")) {
+      handleSessionExpired();
+    }
+  }
+  return response;
 };
 
 // Elementos DOM
@@ -179,7 +212,87 @@ const dom = {
 
   printEmpresaInfo: document.getElementById("print-empresa-info"),
   printPeriodoInfo: document.getElementById("print-periodo-info"),
-  printTimestamp: document.getElementById("print-timestamp")
+  printTimestamp: document.getElementById("print-timestamp"),
+
+  // Elementos de Autenticação / Login
+  authOverlay: document.getElementById("auth-overlay"),
+  formLogin: document.getElementById("form-login"),
+  loginUsername: document.getElementById("login-username"),
+  loginPassword: document.getElementById("login-password"),
+  loginRemember: document.getElementById("login-remember"),
+  btnToggleLoginPwd: document.getElementById("btn-toggle-login-pwd"),
+  eyeOpenIcon: document.getElementById("eye-open-icon"),
+  eyeClosedIcon: document.getElementById("eye-closed-icon"),
+  btnSubmitLogin: document.getElementById("btn-submit-login"),
+  loginSpinner: document.getElementById("login-spinner"),
+  loginErrorAlert: document.getElementById("login-error-alert"),
+  loginErrorText: document.getElementById("login-error-text"),
+  btnFillDemoLogin: document.getElementById("btn-fill-demo-login"),
+
+  // Menu de Usuário Topbar
+  userMenuWrap: document.getElementById("user-menu-wrap"),
+  btnUserProfileMenu: document.getElementById("btn-user-profile-menu"),
+  userDropdownMenu: document.getElementById("user-dropdown-menu"),
+  userAvatarInitials: document.getElementById("user-avatar-initials"),
+  userDisplayName: document.getElementById("user-display-name"),
+  userRoleBadge: document.getElementById("user-role-badge"),
+  dropdownAvatarLarge: document.getElementById("dropdown-avatar-large"),
+  dropdownUserName: document.getElementById("dropdown-user-name"),
+  dropdownUserEmail: document.getElementById("dropdown-user-email"),
+  dropdownUserCargo: document.getElementById("dropdown-user-cargo"),
+  btnOpenPerfil: document.getElementById("btn-open-perfil"),
+  btnOpenUsuarios: document.getElementById("btn-open-usuarios"),
+  btnLogout: document.getElementById("btn-logout"),
+
+  // Modal de Gerenciamento de Usuários
+  modalUsuarios: document.getElementById("modal-usuarios"),
+  btnCloseModalUsuarios: document.getElementById("btn-close-modal-usuarios"),
+  btnCloseModalUsuariosBottom: document.getElementById("btn-close-modal-usuarios-bottom"),
+  searchUsuarios: document.getElementById("search-usuarios"),
+  filterUserRole: document.getElementById("filter-user-role"),
+  btnNovoUsuario: document.getElementById("btn-novo-usuario"),
+  usersTableBody: document.getElementById("users-table-body"),
+  kpiUsersTotal: document.getElementById("kpi-users-total"),
+  kpiUsersAdmins: document.getElementById("kpi-users-admins"),
+  kpiUsersOperadores: document.getElementById("kpi-users-operadores"),
+  kpiUsersAtivos: document.getElementById("kpi-users-ativos"),
+
+  // Modal de Formulário de Usuário (Criar / Editar)
+  modalFormUsuario: document.getElementById("modal-form-usuario"),
+  userFormModalTitle: document.getElementById("user-form-modal-title"),
+  btnCloseFormUsuario: document.getElementById("btn-close-form-usuario"),
+  btnCancelarFormUsuario: document.getElementById("btn-cancelar-form-usuario"),
+  formUsuario: document.getElementById("form-usuario"),
+  formUserId: document.getElementById("form-user-id"),
+  formUserNome: document.getElementById("form-user-nome"),
+  formUserUsername: document.getElementById("form-user-username"),
+  formUserEmail: document.getElementById("form-user-email"),
+  formUserCargo: document.getElementById("form-user-cargo"),
+  formUserRole: document.getElementById("form-user-role"),
+  formUserAtivo: document.getElementById("form-user-ativo"),
+  formUserSenha: document.getElementById("form-user-senha"),
+  formUserConfirmaSenha: document.getElementById("form-user-confirma-senha"),
+  labelUserSenha: document.getElementById("label-user-senha"),
+  formSenhaHint: document.getElementById("form-senha-hint"),
+  formUserError: document.getElementById("form-user-error"),
+  spinnerSalvarUser: document.getElementById("spinner-salvar-user"),
+
+  // Modal Meu Perfil
+  modalPerfil: document.getElementById("modal-perfil"),
+  btnCloseModalPerfil: document.getElementById("btn-close-modal-perfil"),
+  btnCancelarPerfil: document.getElementById("btn-cancelar-perfil"),
+  formMeuPerfil: document.getElementById("form-meu-perfil"),
+  perfilAvatarPreview: document.getElementById("perfil-avatar-preview"),
+  perfilBannerUsername: document.getElementById("perfil-banner-username"),
+  perfilBannerRole: document.getElementById("perfil-banner-role"),
+  perfilBannerCargo: document.getElementById("perfil-banner-cargo"),
+  perfilInputNome: document.getElementById("perfil-input-nome"),
+  perfilInputEmail: document.getElementById("perfil-input-email"),
+  perfilSenhaAtual: document.getElementById("perfil-senha-atual"),
+  perfilNovaSenha: document.getElementById("perfil-nova-senha"),
+  perfilConfirmaSenha: document.getElementById("perfil-confirma-senha"),
+  perfilErrorAlert: document.getElementById("perfil-error-alert"),
+  spinnerSalvarPerfil: document.getElementById("spinner-salvar-perfil")
 };
 
 // Formatação Monetária Brasileira
@@ -229,13 +342,703 @@ function initTheme() {
   });
 }
 
-// Inicialização da Aplicação
+// ==========================================================================
+// MÓDULO DE AUTENTICAÇÃO E SESSÃO DO USUÁRIO
+// ==========================================================================
+
+function handleSessionExpired() {
+  state.token = "";
+  state.currentUser = null;
+  localStorage.removeItem("holerite_auth_token");
+  sessionStorage.removeItem("holerite_auth_token");
+  showAuthOverlay();
+  showToast("Sua sessão expirou. Por favor, autentique-se novamente.", "error");
+}
+
+function showAuthOverlay() {
+  if (dom.authOverlay) {
+    dom.authOverlay.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+}
+
+function hideAuthOverlay() {
+  if (dom.authOverlay) {
+    dom.authOverlay.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+}
+
+async function checkAuthAndInit() {
+  try {
+    const res = await fetch("/api/auth/me");
+    const data = await res.json();
+    if (data.success && data.authenticated && data.user) {
+      applyAuthenticatedUser(data.user);
+      hideAuthOverlay();
+      await loadEmpresas();
+      await loadFiltrosMetadados();
+      await loadPeriodos();
+    } else {
+      showAuthOverlay();
+    }
+  } catch (err) {
+    console.error("Erro ao verificar autenticação inicial:", err);
+    showAuthOverlay();
+  }
+}
+
+function getInitials(name) {
+  if (!name) return "US";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function applyAuthenticatedUser(user) {
+  state.currentUser = user;
+  const initials = getInitials(user.nome || user.username);
+
+  if (dom.userAvatarInitials) dom.userAvatarInitials.textContent = initials;
+  if (dom.dropdownAvatarLarge) dom.dropdownAvatarLarge.textContent = initials;
+  if (dom.userDisplayName) dom.userDisplayName.textContent = user.nome || user.username;
+  if (dom.dropdownUserName) dom.dropdownUserName.textContent = user.nome || user.username;
+  if (dom.dropdownUserEmail) dom.dropdownUserEmail.textContent = user.email || `${user.username}@holeritemanager.local`;
+  if (dom.dropdownUserCargo) dom.dropdownUserCargo.textContent = user.cargo || "Colaborador";
+
+  const isAdmin = user.role === "admin";
+  if (dom.userRoleBadge) {
+    dom.userRoleBadge.textContent = isAdmin ? "Admin" : "Operador";
+    dom.userRoleBadge.className = `badge-role-pill ${isAdmin ? "badge-role-admin" : "badge-role-operador"}`;
+  }
+
+  // Visibilidade de botões restritos a administradores
+  document.querySelectorAll(".admin-only").forEach(el => {
+    el.style.display = isAdmin ? "" : "none";
+  });
+
+  if (dom.btnDeletePeriodo) {
+    dom.btnDeletePeriodo.style.display = isAdmin ? "" : "none";
+  }
+  if (dom.btnSeed12m) {
+    dom.btnSeed12m.style.display = isAdmin ? "" : "none";
+  }
+}
+
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  if (dom.loginErrorAlert) dom.loginErrorAlert.classList.add("hidden");
+
+  const username = dom.loginUsername.value.trim();
+  const senha = dom.loginPassword.value;
+  const remember = dom.loginRemember ? dom.loginRemember.checked : true;
+
+  if (!username || !senha) {
+    showLoginError("Informe o usuário e a senha.");
+    return;
+  }
+
+  if (dom.btnSubmitLogin) dom.btnSubmitLogin.disabled = true;
+  if (dom.loginSpinner) dom.loginSpinner.classList.remove("hidden");
+
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, senha })
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showLoginError(data.error || "Usuário ou senha incorretos.");
+      return;
+    }
+
+    state.token = data.token;
+    if (remember) {
+      localStorage.setItem("holerite_auth_token", data.token);
+    } else {
+      sessionStorage.setItem("holerite_auth_token", data.token);
+    }
+
+    applyAuthenticatedUser(data.user);
+    hideAuthOverlay();
+    dom.formLogin.reset();
+    showToast(`Bem-vindo(a), ${data.user.nome}!`, "success");
+
+    await loadEmpresas();
+    await loadFiltrosMetadados();
+    await loadPeriodos();
+  } catch (err) {
+    console.error("Erro na requisição de login:", err);
+    showLoginError("Erro de comunicação com o servidor. Tente novamente.");
+  } finally {
+    if (dom.btnSubmitLogin) dom.btnSubmitLogin.disabled = false;
+    if (dom.loginSpinner) dom.loginSpinner.classList.add("hidden");
+  }
+}
+
+function showLoginError(msg) {
+  if (dom.loginErrorText) dom.loginErrorText.textContent = msg;
+  if (dom.loginErrorAlert) dom.loginErrorAlert.classList.remove("hidden");
+}
+
+async function handleLogout() {
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } catch (err) {
+    console.warn("Erro ao notificar logout:", err);
+  } finally {
+    state.token = "";
+    state.currentUser = null;
+    localStorage.removeItem("holerite_auth_token");
+    sessionStorage.removeItem("holerite_auth_token");
+    closeUserDropdown();
+    showAuthOverlay();
+    showToast("Sessão finalizada com sucesso.", "info");
+  }
+}
+
+function toggleUserDropdown() {
+  if (!dom.userDropdownMenu) return;
+  const isHidden = dom.userDropdownMenu.classList.contains("hidden");
+  if (isHidden) {
+    dom.userDropdownMenu.classList.remove("hidden");
+    dom.btnUserProfileMenu.setAttribute("aria-expanded", "true");
+  } else {
+    closeUserDropdown();
+  }
+}
+
+function closeUserDropdown() {
+  if (dom.userDropdownMenu) {
+    dom.userDropdownMenu.classList.add("hidden");
+  }
+  if (dom.btnUserProfileMenu) {
+    dom.btnUserProfileMenu.setAttribute("aria-expanded", "false");
+  }
+}
+
+// ==========================================================================
+// MÓDULO DE GESTÃO DE USUÁRIOS (ADMINISTRADOR)
+// ==========================================================================
+
+async function openModalUsuarios() {
+  closeUserDropdown();
+  if (dom.modalUsuarios) {
+    dom.modalUsuarios.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    await loadUsuarios();
+  }
+}
+
+function closeModalUsuarios() {
+  if (dom.modalUsuarios) {
+    dom.modalUsuarios.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+}
+
+async function loadUsuarios() {
+  if (!dom.usersTableBody) return;
+  dom.usersTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted" style="padding: 30px;">Carregando usuários...</td></tr>`;
+
+  try {
+    const res = await fetch("/api/usuarios");
+    const data = await res.json();
+    if (!data.success) {
+      showToast(data.error || "Erro ao carregar usuários.", "error");
+      return;
+    }
+
+    state.usersList = data.usuarios || [];
+    updateUsersKPIs(state.usersList);
+    filterAndRenderUsuarios();
+  } catch (err) {
+    console.error("Erro ao carregar lista de usuários:", err);
+    dom.usersTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger" style="padding: 24px;">Falha ao carregar lista de usuários.</td></tr>`;
+  }
+}
+
+function updateUsersKPIs(users) {
+  const total = users.length;
+  const admins = users.filter(u => u.role === "admin").length;
+  const operadores = users.filter(u => u.role !== "admin").length;
+  const ativos = users.filter(u => u.ativo).length;
+
+  if (dom.kpiUsersTotal) dom.kpiUsersTotal.textContent = total;
+  if (dom.kpiUsersAdmins) dom.kpiUsersAdmins.textContent = admins;
+  if (dom.kpiUsersOperadores) dom.kpiUsersOperadores.textContent = operadores;
+  if (dom.kpiUsersAtivos) dom.kpiUsersAtivos.textContent = ativos;
+}
+
+function filterAndRenderUsuarios() {
+  const query = (dom.searchUsuarios ? dom.searchUsuarios.value : "").trim().toLowerCase();
+  const roleFilter = dom.filterUserRole ? dom.filterUserRole.value : "all";
+
+  let filtered = state.usersList;
+
+  if (roleFilter !== "all") {
+    filtered = filtered.filter(u => u.role === roleFilter);
+  }
+
+  if (query) {
+    filtered = filtered.filter(u =>
+      (u.nome && u.nome.toLowerCase().includes(query)) ||
+      (u.username && u.username.toLowerCase().includes(query)) ||
+      (u.email && u.email.toLowerCase().includes(query)) ||
+      (u.cargo && u.cargo.toLowerCase().includes(query))
+    );
+  }
+
+  renderUsuariosTable(filtered);
+}
+
+function renderUsuariosTable(users) {
+  if (!dom.usersTableBody) return;
+  dom.usersTableBody.innerHTML = "";
+
+  if (users.length === 0) {
+    dom.usersTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted" style="padding: 30px;">Nenhum usuário encontrado com os filtros atuais.</td></tr>`;
+    return;
+  }
+
+  users.forEach(u => {
+    const tr = document.createElement("tr");
+    const initials = getInitials(u.nome || u.username);
+    const isAdmin = u.role === "admin";
+    const isSelf = state.currentUser && state.currentUser.id === u.id;
+
+    const roleBadge = isAdmin
+      ? `<span class="badge-role-pill badge-role-admin">Administrador</span>`
+      : `<span class="badge-role-pill badge-role-operador">Operador</span>`;
+
+    const statusBadge = u.ativo
+      ? `<span class="badge-status-ativo">Ativo</span>`
+      : `<span class="badge-status-inativo">Inativo</span>`;
+
+    const lastLoginText = u.ultimo_login
+      ? formatDateTime(u.ultimo_login)
+      : `<span class="text-muted">Nunca acessou</span>`;
+
+    tr.innerHTML = `
+      <td>
+        <div class="user-cell">
+          <div class="user-cell-avatar">${initials}</div>
+          <div class="user-cell-meta">
+            <strong>${escapeHtml(u.nome)} ${isSelf ? '<span class="badge badge-info" style="font-size: 10px; margin-left: 4px;">Você</span>' : ''}</strong>
+            <span>@${escapeHtml(u.username)}</span>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div class="user-contact-meta">
+          <span>${escapeHtml(u.email || "Sem e-mail")}</span>
+          <small>${escapeHtml(u.cargo || "Colaborador")}</small>
+        </div>
+      </td>
+      <td class="text-center">${roleBadge}</td>
+      <td class="text-center">${statusBadge}</td>
+      <td class="text-center font-mono" style="font-size: 12px;">${lastLoginText}</td>
+      <td class="text-center">
+        <div class="user-actions-cell">
+          <button class="btn-action-icon btn-action-edit" data-id="${u.id}" title="Editar dados e permissões" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+          </button>
+          <button class="btn-action-icon btn-action-toggle" data-id="${u.id}" title="${u.ativo ? 'Desativar acesso deste usuário' : 'Reativar acesso deste usuário'}" type="button" ${isSelf ? 'disabled style="opacity: 0.35; cursor: not-allowed;"' : ''}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+          </button>
+          <button class="btn-action-icon btn-action-delete" data-id="${u.id}" data-name="${escapeHtml(u.username)}" title="Excluir usuário do sistema" type="button" ${isSelf ? 'disabled style="opacity: 0.35; cursor: not-allowed;"' : ''}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        </div>
+      </td>
+    `;
+
+    tr.querySelector(".btn-action-edit").addEventListener("click", () => openModalFormUsuario(u.id));
+
+    const btnToggle = tr.querySelector(".btn-action-toggle");
+    if (!isSelf && btnToggle) {
+      btnToggle.addEventListener("click", () => toggleUserStatus(u.id, u.nome || u.username, u.ativo));
+    }
+
+    const btnDel = tr.querySelector(".btn-action-delete");
+    if (!isSelf && btnDel) {
+      btnDel.addEventListener("click", () => deleteUser(u.id, u.username));
+    }
+
+    dom.usersTableBody.appendChild(tr);
+  });
+}
+
+function formatDateTime(dtStr) {
+  if (!dtStr) return "";
+  try {
+    const d = new Date(dtStr.replace(" ", "T"));
+    if (isNaN(d.getTime())) return dtStr;
+    return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  } catch (e) {
+    return dtStr;
+  }
+}
+
+// Submodal de Usuário (Criar / Editar)
+function openModalFormUsuario(userId = null) {
+  if (dom.formUserError) dom.formUserError.classList.add("hidden");
+  dom.formUsuario.reset();
+
+  if (userId) {
+    const target = state.usersList.find(u => u.id === userId);
+    if (!target) return;
+
+    dom.userFormModalTitle.textContent = "Editar Usuário: @" + target.username;
+    dom.formUserId.value = target.id;
+    dom.formUserNome.value = target.nome || "";
+    dom.formUserUsername.value = target.username || "";
+    dom.formUserUsername.disabled = true;
+    dom.formUserEmail.value = target.email || "";
+    dom.formUserCargo.value = target.cargo || "";
+    dom.formUserRole.value = target.role || "operador";
+    dom.formUserAtivo.value = target.ativo ? "1" : "0";
+
+    dom.labelUserSenha.textContent = "Nova Senha (Opcional)";
+    dom.formUserSenha.required = false;
+    dom.formUserSenha.placeholder = "Deixe em branco para não alterar";
+    dom.formSenhaHint.textContent = "Preencha apenas se desejar redefinir a senha do usuário.";
+  } else {
+    dom.userFormModalTitle.textContent = "Novo Usuário do Sistema";
+    dom.formUserId.value = "";
+    dom.formUserUsername.disabled = false;
+    dom.formUserRole.value = "operador";
+    dom.formUserAtivo.value = "1";
+
+    dom.labelUserSenha.textContent = "Senha de Acesso *";
+    dom.formUserSenha.required = true;
+    dom.formUserSenha.placeholder = "Mínimo 4 caracteres";
+    dom.formSenhaHint.textContent = "Mínimo de 4 caracteres para a senha inicial.";
+  }
+
+  if (dom.modalFormUsuario) {
+    dom.modalFormUsuario.classList.remove("hidden");
+  }
+}
+
+function closeModalFormUsuario() {
+  if (dom.modalFormUsuario) {
+    dom.modalFormUsuario.classList.add("hidden");
+  }
+}
+
+async function handleSalvarUsuario(e) {
+  e.preventDefault();
+  if (dom.formUserError) dom.formUserError.classList.add("hidden");
+
+  const id = dom.formUserId.value;
+  const isEdit = Boolean(id);
+
+  const nome = dom.formUserNome.value.trim();
+  const username = dom.formUserUsername.value.trim().toLowerCase();
+  const email = dom.formUserEmail.value.trim().toLowerCase();
+  const cargo = dom.formUserCargo.value.trim();
+  const role = dom.formUserRole.value;
+  const ativo = dom.formUserAtivo.value === "1";
+  const senha = dom.formUserSenha.value;
+  const confirmaSenha = dom.formUserConfirmaSenha.value;
+
+  if (!isEdit && !username) {
+    showFormUserError("Informe o nome de usuário.");
+    return;
+  }
+
+  if (!isEdit && (!senha || senha.length < 4)) {
+    showFormUserError("A senha inicial deve ter pelo menos 4 caracteres.");
+    return;
+  }
+
+  if (senha && senha !== confirmaSenha) {
+    showFormUserError("A confirmação de senha não confere com a senha digitada.");
+    return;
+  }
+
+  if (dom.spinnerSalvarUser) dom.spinnerSalvarUser.classList.remove("hidden");
+
+  try {
+    let url, method, body;
+    if (isEdit) {
+      url = `/api/usuarios/${id}`;
+      method = "PUT";
+      body = { nome, email, cargo, role, ativo };
+      if (senha) body.nova_senha = senha;
+    } else {
+      url = "/api/usuarios";
+      method = "POST";
+      body = { username, nome, email, senha, cargo, role, ativo };
+    }
+
+    const res = await fetch(url, {
+      method: method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showFormUserError(data.error || "Erro ao salvar usuário.");
+      return;
+    }
+
+    showToast(data.message || "Usuário salvo com sucesso!", "success");
+    closeModalFormUsuario();
+    await loadUsuarios();
+
+    if (isEdit && state.currentUser && state.currentUser.id === parseInt(id)) {
+      applyAuthenticatedUser(data.usuario);
+    }
+  } catch (err) {
+    console.error("Erro ao salvar usuário:", err);
+    showFormUserError("Erro ao comunicar com o servidor.");
+  } finally {
+    if (dom.spinnerSalvarUser) dom.spinnerSalvarUser.classList.add("hidden");
+  }
+}
+
+function showFormUserError(msg) {
+  if (dom.formUserError) {
+    dom.formUserError.textContent = msg;
+    dom.formUserError.classList.remove("hidden");
+  }
+}
+
+async function toggleUserStatus(userId, username, statusAtual) {
+  const acao = statusAtual ? "desativar" : "ativar";
+  if (!confirm(`Deseja realmente ${acao} o acesso do usuário '${username}'?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/usuarios/${userId}/toggle`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showToast(data.error || `Erro ao ${acao} usuário.`, "error");
+      return;
+    }
+    showToast(data.message || `Usuário atualizado com sucesso.`, "success");
+    await loadUsuarios();
+  } catch (err) {
+    console.error("Erro ao alternar status do usuário:", err);
+    showToast("Erro ao comunicar com o servidor.", "error");
+  }
+}
+
+async function deleteUser(userId, username) {
+  if (!confirm(`Tem certeza de que deseja EXCLUIR definitivamente o usuário '${username}'?\nEsta ação não poderá ser desfeita.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/usuarios/${userId}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      showToast(data.error || "Erro ao excluir usuário.", "error");
+      return;
+    }
+    showToast(data.message || "Usuário excluído com sucesso.", "success");
+    await loadUsuarios();
+  } catch (err) {
+    console.error("Erro ao excluir usuário:", err);
+    showToast("Erro ao comunicar com o servidor.", "error");
+  }
+}
+
+// ==========================================================================
+// MÓDULO DE MEU PERFIL E ALTERAÇÃO DE SENHA PESSOAL
+// ==========================================================================
+
+function openModalPerfil() {
+  closeUserDropdown();
+  if (!state.currentUser) return;
+
+  if (dom.perfilErrorAlert) dom.perfilErrorAlert.classList.add("hidden");
+  dom.formMeuPerfil.reset();
+
+  const u = state.currentUser;
+  const initials = getInitials(u.nome || u.username);
+
+  if (dom.perfilAvatarPreview) dom.perfilAvatarPreview.textContent = initials;
+  if (dom.perfilBannerUsername) dom.perfilBannerUsername.textContent = "@" + u.username;
+  if (dom.perfilBannerCargo) dom.perfilBannerCargo.textContent = u.cargo || "Colaborador";
+  if (dom.perfilBannerRole) {
+    const isAdmin = u.role === "admin";
+    dom.perfilBannerRole.textContent = isAdmin ? "Administrador" : "Operador";
+    dom.perfilBannerRole.className = `badge-role-pill ${isAdmin ? "badge-role-admin" : "badge-role-operador"}`;
+  }
+
+  if (dom.perfilInputNome) dom.perfilInputNome.value = u.nome || "";
+  if (dom.perfilInputEmail) dom.perfilInputEmail.value = u.email || "";
+
+  if (dom.modalPerfil) {
+    dom.modalPerfil.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+}
+
+function closeModalPerfil() {
+  if (dom.modalPerfil) {
+    dom.modalPerfil.classList.add("hidden");
+    document.body.style.overflow = "";
+  }
+}
+
+async function handleSalvarPerfil(e) {
+  e.preventDefault();
+  if (dom.perfilErrorAlert) dom.perfilErrorAlert.classList.add("hidden");
+
+  const nome = dom.perfilInputNome.value.trim();
+  const email = dom.perfilInputEmail.value.trim().toLowerCase();
+  const senhaAtual = dom.perfilSenhaAtual.value;
+  const novaSenha = dom.perfilNovaSenha.value;
+  const confirmaSenha = dom.perfilConfirmaSenha.value;
+
+  if (!nome) {
+    showPerfilError("O nome completo é obrigatório.");
+    return;
+  }
+
+  if (novaSenha) {
+    if (!senhaAtual) {
+      showPerfilError("Informe sua senha atual para autorizar a troca de senha.");
+      return;
+    }
+    if (novaSenha.length < 4) {
+      showPerfilError("A nova senha deve ter no mínimo 4 caracteres.");
+      return;
+    }
+    if (novaSenha !== confirmaSenha) {
+      showPerfilError("A confirmação da nova senha não confere.");
+      return;
+    }
+  }
+
+  if (dom.spinnerSalvarPerfil) dom.spinnerSalvarPerfil.classList.remove("hidden");
+
+  try {
+    const payload = { nome, email };
+    if (novaSenha) {
+      payload.senha_atual = senhaAtual;
+      payload.nova_senha = novaSenha;
+    }
+
+    const res = await fetch("/api/auth/perfil", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showPerfilError(data.error || "Erro ao atualizar perfil.");
+      return;
+    }
+
+    showToast("Perfil atualizado com sucesso!", "success");
+    applyAuthenticatedUser(data.user);
+    closeModalPerfil();
+  } catch (err) {
+    console.error("Erro ao atualizar perfil próprio:", err);
+    showPerfilError("Erro ao comunicar com o servidor.");
+  } finally {
+    if (dom.spinnerSalvarPerfil) dom.spinnerSalvarPerfil.classList.add("hidden");
+  }
+}
+
+function showPerfilError(msg) {
+  if (dom.perfilErrorAlert) {
+    dom.perfilErrorAlert.textContent = msg;
+    dom.perfilErrorAlert.classList.remove("hidden");
+  }
+}
+
+function setupAuthEventListeners() {
+  if (dom.formLogin) {
+    dom.formLogin.addEventListener("submit", (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      handleLoginSubmit(e);
+      return false;
+    });
+  }
+
+  if (dom.btnSubmitLogin) {
+    dom.btnSubmitLogin.addEventListener("click", (e) => {
+      if (e) {
+        e.preventDefault();
+      }
+      handleLoginSubmit(e);
+    });
+  }
+
+  if (dom.btnToggleLoginPwd) {
+    dom.btnToggleLoginPwd.addEventListener("click", () => {
+      const isPwd = dom.loginPassword.type === "password";
+      dom.loginPassword.type = isPwd ? "text" : "password";
+      if (dom.eyeOpenIcon && dom.eyeClosedIcon) {
+        dom.eyeOpenIcon.classList.toggle("hidden", isPwd);
+        dom.eyeClosedIcon.classList.toggle("hidden", !isPwd);
+      }
+    });
+  }
+
+  if (dom.btnFillDemoLogin) {
+    dom.btnFillDemoLogin.addEventListener("click", () => {
+      if (dom.loginUsername) dom.loginUsername.value = "admin";
+      if (dom.loginPassword) dom.loginPassword.value = "admin";
+      if (dom.loginErrorAlert) dom.loginErrorAlert.classList.add("hidden");
+    });
+  }
+
+  if (dom.btnUserProfileMenu) {
+    dom.btnUserProfileMenu.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleUserDropdown();
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    if (dom.userMenuWrap && !dom.userMenuWrap.contains(e.target)) {
+      closeUserDropdown();
+    }
+  });
+
+  if (dom.btnLogout) {
+    dom.btnLogout.addEventListener("click", handleLogout);
+  }
+
+  if (dom.btnOpenPerfil) dom.btnOpenPerfil.addEventListener("click", openModalPerfil);
+  if (dom.btnCloseModalPerfil) dom.btnCloseModalPerfil.addEventListener("click", closeModalPerfil);
+  if (dom.btnCancelarPerfil) dom.btnCancelarPerfil.addEventListener("click", closeModalPerfil);
+  if (dom.formMeuPerfil) dom.formMeuPerfil.addEventListener("submit", handleSalvarPerfil);
+
+  if (dom.btnOpenUsuarios) dom.btnOpenUsuarios.addEventListener("click", openModalUsuarios);
+  if (dom.btnCloseModalUsuarios) dom.btnCloseModalUsuarios.addEventListener("click", closeModalUsuarios);
+  if (dom.btnCloseModalUsuariosBottom) dom.btnCloseModalUsuariosBottom.addEventListener("click", closeModalUsuarios);
+
+  if (dom.searchUsuarios) dom.searchUsuarios.addEventListener("input", filterAndRenderUsuarios);
+  if (dom.filterUserRole) dom.filterUserRole.addEventListener("change", filterAndRenderUsuarios);
+
+  if (dom.btnNovoUsuario) dom.btnNovoUsuario.addEventListener("click", () => openModalFormUsuario(null));
+  if (dom.btnCloseFormUsuario) dom.btnCloseFormUsuario.addEventListener("click", closeModalFormUsuario);
+  if (dom.btnCancelarFormUsuario) dom.btnCancelarFormUsuario.addEventListener("click", closeModalFormUsuario);
+  if (dom.formUsuario) dom.formUsuario.addEventListener("submit", handleSalvarUsuario);
+}
+
+// Inicialização da Aplicação com Verificação de Sessão
 async function initApp() {
   initTheme();
+  setupAuthEventListeners();
   setupEventListeners();
-  await loadEmpresas();
-  await loadFiltrosMetadados();
-  await loadPeriodos();
+  await checkAuthAndInit();
 }
 
 // Configuração de Eventos
