@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  holeritis:
+    build: .
+    container_name: holeritis-app
+    restart: unless-stopped
+    ports:
+      - "8050:8050"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8050
+      - DATA_DIR=/app/data
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - holeritis_data:/app/data
+      - holeritis_uploads:/app/uploads
+
+volumes:
+  holeritis_data:
+    driver: local
+  holeritis_uploads:
+    driver: local

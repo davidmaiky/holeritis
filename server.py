@@ -19,7 +19,7 @@ import excel_generator
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", BASE_DIR / "uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 class HoleriteRequestHandler(SimpleHTTPRequestHandler):
@@ -49,6 +49,11 @@ class HoleriteRequestHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/")
         query = urllib.parse.parse_qs(parsed.query)
+
+        # Healthcheck para Easypanel / Docker
+        if path == "/api/health":
+            self._send_json(200, {"status": "ok", "service": "holeritis"})
+            return
 
         # Rota de Lista de Empresas (Razões Sociais)
         if path == "/api/empresas":
@@ -356,7 +361,15 @@ class HoleriteRequestHandler(SimpleHTTPRequestHandler):
 
         self._send_error(404, "Rota DELETE não encontrada")
 
-def start_server(port=8050):
+def start_server(host=None, port=None):
+    if host is None:
+        host = os.environ.get("HOST", "0.0.0.0")
+    if port is None:
+        try:
+            port = int(os.environ.get("PORT", "8050"))
+        except ValueError:
+            port = 8050
+
     database.init_db()
     
     # Se a base estiver vazia e o modelo existir, importar automaticamente
@@ -369,11 +382,11 @@ def start_server(port=8050):
             database.salvar_relatorio(resumo, emps, "folha-agosto-2026.pdf")
             print("Importação inicial concluída com sucesso.")
 
-    server_address = ("127.0.0.1", port)
+    server_address = (host, port)
     httpd = ThreadingHTTPServer(server_address, HoleriteRequestHandler)
     print(f"\n========================================================")
     print(f"  SISTEMA DE GESTÃO DE FOLHA E HOLERITES INICIADO")
-    print(f"  Acesse no navegador: http://localhost:{port}")
+    print(f"  Servidor ativo em: http://{host}:{port}")
     print(f"========================================================\n")
     try:
         httpd.serve_forever()
@@ -382,10 +395,16 @@ def start_server(port=8050):
         httpd.server_close()
 
 if __name__ == "__main__":
-    port = 8050
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = None
     if len(sys.argv) > 1:
         try:
             port = int(sys.argv[1])
         except ValueError:
             pass
-    start_server(port)
+    if port is None:
+        try:
+            port = int(os.environ.get("PORT", "8050"))
+        except ValueError:
+            port = 8050
+    start_server(host=host, port=port)

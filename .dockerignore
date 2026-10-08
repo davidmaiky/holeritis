@@ -1,0 +1,17 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.git
+.gitignore
+.dockerignore
+data/*.db
+data/*.db-journal
+uploads/*
+!uploads/.gitkeep
+run.bat
+*.log

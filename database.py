@@ -9,8 +9,9 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-DB_DIR = Path(__file__).resolve().parent / "data"
-DB_PATH = DB_DIR / "holerites.db"
+BASE_DIR = Path(__file__).resolve().parent
+DB_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR / "data"))
+DB_PATH = Path(os.environ.get("DB_PATH", DB_DIR / "holerites.db"))
 
 def get_connection():
     DB_DIR.mkdir(parents=True, exist_ok=True)

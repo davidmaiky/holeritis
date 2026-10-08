@@ -131,3 +131,16 @@ python server.py 8050
 ```
 Em seguida, acesse no navegador: [http://localhost:8050](http://localhost:8050).
 
+---
+
+### 🐳 Servidor / Easypanel / Docker
+
+Para rodar em um servidor VPS gerenciado com **Easypanel** ou Docker:
+
+- Consulte o guia passo a passo completo em: [EASYPANEL_DEPLOY.md](EASYPANEL_DEPLOY.md).
+- Para executar diretamente com Docker Compose:
+  ```bash
+  docker compose up -d
+  ```
+
+
