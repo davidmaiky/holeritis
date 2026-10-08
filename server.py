@@ -15,6 +15,7 @@ from pathlib import Path
 
 import database
 import parser
+import excel_generator
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -225,6 +226,32 @@ class HoleriteRequestHandler(SimpleHTTPRequestHandler):
                 self.wfile.write(raw_bytes)
             except Exception as e:
                 self._send_error(500, f"Erro ao gerar CSV: {str(e)}")
+            return
+
+        # Rota de Exportação Excel (.xlsx) Completa e Estilizada
+        match_excel = re.match(r"^/api/export/excel/(\d+)$", path)
+        if match_excel:
+            periodo_id = int(match_excel.group(1))
+            try:
+                rel = database.obter_relatorio(periodo_id)
+                if not rel:
+                    self._send_error(404, "Período não encontrado")
+                    return
+
+                excel_bytes = excel_generator.gerar_excel_bytes(rel)
+
+                safe_empresa = re.sub(r'[^a-zA-Z0-9_\-]', '_', rel.get('empresa', 'empresa'))[:25]
+                safe_name = re.sub(r'[^a-zA-Z0-9_\-]', '_', rel.get('mes_ano', 'periodo')) or f"periodo_{periodo_id}"
+                filename = f"relatorio_completo_folha_{safe_empresa}_{safe_name}.xlsx"
+
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                self.send_header("Content-Length", str(len(excel_bytes)))
+                self.end_headers()
+                self.wfile.write(excel_bytes)
+            except Exception as e:
+                self._send_error(500, f"Erro ao gerar Excel: {str(e)}")
             return
 
         # Servir index.html na raiz

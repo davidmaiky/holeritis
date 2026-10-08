@@ -175,6 +175,7 @@ const dom = {
   modalValorFgts: document.getElementById("modal-valor-fgts"),
   modalBaseIrrf: document.getElementById("modal-base-irrf"),
   modalDeducoesIrrf: document.getElementById("modal-deducoes-irrf"),
+  btnExportHoleriteExcel: document.getElementById("btn-export-holerite-excel"),
 
   printEmpresaInfo: document.getElementById("print-empresa-info"),
   printPeriodoInfo: document.getElementById("print-periodo-info"),
@@ -470,6 +471,13 @@ function setupEventListeners() {
     });
   }
   if (dom.btnPrintHolerite) dom.btnPrintHolerite.addEventListener("click", printHoleriteIndividual);
+  if (dom.btnExportHoleriteExcel) {
+    dom.btnExportHoleriteExcel.addEventListener("click", () => {
+      if (state.currentModalEmployee) {
+        exportIndividualHoleriteExcel(state.currentModalEmployee);
+      }
+    });
+  }
 
   // Tecla ESC para fechar modal
   document.addEventListener("keydown", (e) => {
@@ -1198,71 +1206,588 @@ async function confirmDeletePeriodo() {
   }
 }
 
-// Exportação para Excel (.xlsx) com formatação profissional
-function exportToExcel() {
-  if (!state.currentRelatorio || !state.currentRelatorio.itens) return;
+// ============================================================================
+// EXPORTAÇÃO EXCEL PROFISSIONAL COM DETALHAMENTO COMPLETO DE HOLERITES
+// Formatação: Cores Azuis para Créditos / Proventos e Vermelhas para Débitos / Descontos
+// ============================================================================
 
-  if (typeof XLSX === "undefined") {
-    showToast("Biblioteca XLSX indisponível. Utilize a exportação CSV.", "error");
+const EXCEL_STYLES = {
+  fontTitle: { name: "Segoe UI", size: 13, bold: true, color: { argb: "FFFFFFFF" } },
+  fontSubtitle: { name: "Segoe UI", size: 10, italic: true, color: { argb: "FFFFFFFF" } },
+  fontTh: { name: "Segoe UI", size: 10, bold: true, color: { argb: "FFFFFFFF" } },
+  fontEmpHeader: { name: "Segoe UI", size: 11, bold: true, color: { argb: "FF0F172A" } },
+  fontEmpSub: { name: "Segoe UI", size: 9, bold: false, color: { argb: "FF334155" } },
+  fontText: { name: "Segoe UI", size: 9, color: { argb: "FF1F2937" } },
+  fontCode: { name: "Consolas", size: 9, color: { argb: "FF475569" } },
+  fontMuted: { name: "Segoe UI", size: 9, color: { argb: "FF9CA3AF" } },
+
+  // Crédito (Azul Real)
+  fontCreditoBadge: { name: "Segoe UI", size: 9, bold: true, color: { argb: "FF1E40AF" } },
+  fontCreditoVal: { name: "Segoe UI", size: 9, bold: true, color: { argb: "FF1E40AF" } },
+  fillCreditoBadge: { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } },
+  fillCreditoCell: { type: "pattern", pattern: "solid", fgColor: { argb: "FFEFF6FF" } },
+  borderCredito: {
+    top: { style: "thin", color: { argb: "FFBFDBFE" } },
+    left: { style: "thin", color: { argb: "FFBFDBFE" } },
+    bottom: { style: "thin", color: { argb: "FFBFDBFE" } },
+    right: { style: "thin", color: { argb: "FFBFDBFE" } }
+  },
+
+  // Débito (Vermelho Carmesim)
+  fontDebitoBadge: { name: "Segoe UI", size: 9, bold: true, color: { argb: "FF991B1B" } },
+  fontDebitoVal: { name: "Segoe UI", size: 9, bold: true, color: { argb: "FFB91C1C" } },
+  fillDebitoBadge: { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEE2E2" } },
+  fillDebitoCell: { type: "pattern", pattern: "solid", fgColor: { argb: "FFFEF2F2" } },
+  borderDebito: {
+    top: { style: "thin", color: { argb: "FFFECACA" } },
+    left: { style: "thin", color: { argb: "FFFECACA" } },
+    bottom: { style: "thin", color: { argb: "FFFECACA" } },
+    right: { style: "thin", color: { argb: "FFFECACA" } }
+  },
+
+  // Líquido (Verde Institucional)
+  fontLiquidoVal: { name: "Segoe UI", size: 11, bold: true, color: { argb: "FF166534" } },
+  fillLiquido: { type: "pattern", pattern: "solid", fgColor: { argb: "FFDCFCE7" } },
+
+  fontTotaisHeader: { name: "Segoe UI", size: 10, bold: true, color: { argb: "FF0F172A" } },
+  fillTotaisBar: { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } },
+
+  fillBrand: { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A8A" } },
+  fillTableHead: { type: "pattern", pattern: "solid", fgColor: { argb: "FF334155" } },
+  fillEmpHead: { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } },
+  fillBasesHead: { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } },
+
+  borderBox: {
+    top: { style: "thin", color: { argb: "FFCBD5E1" } },
+    left: { style: "thin", color: { argb: "FFCBD5E1" } },
+    bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+    right: { style: "thin", color: { argb: "FFCBD5E1" } }
+  },
+
+  numFmtCurr: '"R$" #,##0.00;[Red]-"R$" #,##0.00;"R$" 0.00'
+};
+
+async function buildExcelReportWorkbook(rel, employeesList, isIndividual = false) {
+  if (typeof ExcelJS === "undefined") {
+    throw new Error("Biblioteca ExcelJS indisponível");
+  }
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "HoleriteManager";
+  wb.created = new Date();
+
+  const empresaNome = rel.empresa || "EMPRESA";
+  const periodoTxt = rel.periodo_texto || rel.mes_ano || "--";
+  const cnpjTxt = rel.cnpj ? `CNPJ: ${rel.cnpj}` : "";
+
+  // =========================================================================
+  // ABA 1: HOLERITES DETALHADOS (Todos os eventos, créditos e débitos)
+  // =========================================================================
+  const sheetTitle = isIndividual ? "Holerite Detalhado" : "Holerites Detalhados";
+  const ws1 = wb.addWorksheet(sheetTitle, { views: [{ showGridLines: true }] });
+
+  ws1.columns = [
+    { key: "c1", width: 10 }, // Cód
+    { key: "c2", width: 44 }, // Descrição
+    { key: "c3", width: 14 }, // Referência
+    { key: "c4", width: 14 }, // Tipo
+    { key: "c5", width: 24 }, // Crédito
+    { key: "c6", width: 24 }  // Débito
+  ];
+
+  // Banner Geral da Empresa
+  ws1.mergeCells(1, 1, 1, 6);
+  const titleCell = ws1.getCell(1, 1);
+  titleCell.value = `DEMONSTRATIVO DETALHADO DE FOLHA DE PAGAMENTO - ${empresaNome}`;
+  titleCell.font = EXCEL_STYLES.fontTitle;
+  titleCell.fill = EXCEL_STYLES.fillBrand;
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  ws1.getRow(1).height = 28;
+
+  ws1.mergeCells(2, 1, 2, 6);
+  const subCell = ws1.getCell(2, 1);
+  subCell.value = `${cnpjTxt ? cnpjTxt + "   |   " : ""}Período: ${periodoTxt}   |   Competência: ${rel.mes_ano || "--"}`;
+  subCell.font = EXCEL_STYLES.fontSubtitle;
+  subCell.fill = EXCEL_STYLES.fillBrand;
+  subCell.alignment = { horizontal: "center", vertical: "middle" };
+  ws1.getRow(2).height = 20;
+
+  let r = 4;
+  for (const emp of employeesList) {
+    const dados = emp.dados_adicionais || {};
+    const bases = emp.bases || {};
+    const eventos = Array.isArray(emp.eventos) && emp.eventos.length > 0 ? emp.eventos : [];
+
+    // Card do Colaborador - Linha 1: Nome e Código
+    ws1.mergeCells(r, 1, r, 6);
+    const cEmp = ws1.getCell(r, 1);
+    const codStr = emp.codigo ? `Cód: ${emp.codigo}` : "Cód: -";
+    cEmp.value = `👤 ${emp.nome}  (${codStr})`;
+    cEmp.font = EXCEL_STYLES.fontEmpHeader;
+    cEmp.fill = EXCEL_STYLES.fillEmpHead;
+    cEmp.alignment = { horizontal: "left", vertical: "middle", indent: 1 };
+    for (let c = 1; c <= 6; c++) ws1.getCell(r, c).border = EXCEL_STYLES.borderBox;
+    ws1.getRow(r).height = 24;
+    r++;
+
+    // Card do Colaborador - Linha 2: Ficha Cadastral e Salário Base
+    ws1.mergeCells(r, 1, r, 6);
+    const cMeta = ws1.getCell(r, 1);
+    const salStr = formatBRL(emp.salario);
+    cMeta.value = `Cargo: ${emp.funcao || "Não informado"}   |   Admissão: ${dados.admissao || "-"}   |   Situação: ${dados.situacao || "Ativo"}   |   Dep. IR: ${dados.dependentes_ir !== undefined ? dados.dependentes_ir : 0}   |   Salário Base: ${salStr}`;
+    cMeta.font = EXCEL_STYLES.fontEmpSub;
+    cMeta.fill = EXCEL_STYLES.fillBasesHead;
+    cMeta.alignment = { horizontal: "left", vertical: "middle", indent: 1 };
+    for (let c = 1; c <= 6; c++) ws1.getCell(r, c).border = EXCEL_STYLES.borderBox;
+    ws1.getRow(r).height = 20;
+    r++;
+
+    // Cabeçalho da Tabela de Rubricas
+    const ths = [
+      "Cód.",
+      "Descrição da Rubrica / Evento",
+      "Referência",
+      "Tipo",
+      "Crédito / Proventos (R$)",
+      "Débito / Descontos (R$)"
+    ];
+    ths.forEach((txt, idx) => {
+      const cell = ws1.getCell(r, idx + 1);
+      cell.value = txt;
+      cell.font = EXCEL_STYLES.fontTh;
+      cell.fill = EXCEL_STYLES.fillTableHead;
+      cell.alignment = {
+        horizontal: (idx === 0 || idx === 2 || idx === 3) ? "center" : (idx >= 4 ? "right" : "left"),
+        vertical: "middle"
+      };
+      cell.border = EXCEL_STYLES.borderBox;
+    });
+    ws1.getRow(r).height = 22;
+    r++;
+
+    // Eventos a renderizar (com fallback elegante para folhas legadas sem rubricas)
+    const evtsToRender = eventos.length > 0 ? eventos : [
+      { codigo: "001", descricao: "Salário Base / Proventos Contratuais", referencia: "30d", valor: emp.proventos, tipo: "provento" }
+    ];
+    if (eventos.length === 0 && emp.adiantamento_anterior > 0) {
+      evtsToRender.push({ codigo: "012", descricao: "Adiantamento Anterior Compensado", referencia: "-", valor: emp.adiantamento_anterior, tipo: "desconto" });
+    }
+    if (eventos.length === 0 && emp.descontos > 0) {
+      evtsToRender.push({ codigo: "999", descricao: "Descontos e Retenções Legais Totais", referencia: "-", valor: emp.descontos, tipo: "desconto" });
+    }
+
+    let somaCred = 0;
+    let somaDeb = 0;
+
+    for (const evt of evtsToRender) {
+      const isProv = evt.tipo === "provento";
+      const val = Number(evt.valor) || 0;
+      if (isProv) somaCred += val; else somaDeb += val;
+
+      const c1 = ws1.getCell(r, 1);
+      c1.value = evt.codigo || "-";
+      c1.font = EXCEL_STYLES.fontCode;
+      c1.alignment = { horizontal: "center", vertical: "middle" };
+      c1.border = EXCEL_STYLES.borderBox;
+
+      const c2 = ws1.getCell(r, 2);
+      c2.value = evt.descricao || "Item";
+      c2.font = EXCEL_STYLES.fontText;
+      c2.alignment = { horizontal: "left", vertical: "middle" };
+      c2.border = EXCEL_STYLES.borderBox;
+
+      const c3 = ws1.getCell(r, 3);
+      c3.value = (evt.referencia && evt.referencia !== "-") ? evt.referencia : "-";
+      c3.font = EXCEL_STYLES.fontCode;
+      c3.alignment = { horizontal: "center", vertical: "middle" };
+      c3.border = EXCEL_STYLES.borderBox;
+
+      const c4 = ws1.getCell(r, 4);
+      const c5 = ws1.getCell(r, 5);
+      const c6 = ws1.getCell(r, 6);
+
+      if (isProv) {
+        // Formatação de CRÉDITO em AZUL
+        c4.value = "CRÉDITO";
+        c4.font = EXCEL_STYLES.fontCreditoBadge;
+        c4.fill = EXCEL_STYLES.fillCreditoBadge;
+        c4.alignment = { horizontal: "center", vertical: "middle" };
+        c4.border = EXCEL_STYLES.borderCredito;
+
+        c5.value = val;
+        c5.numFmt = EXCEL_STYLES.numFmtCurr;
+        c5.font = EXCEL_STYLES.fontCreditoVal;
+        c5.fill = EXCEL_STYLES.fillCreditoCell;
+        c5.alignment = { horizontal: "right", vertical: "middle" };
+        c5.border = EXCEL_STYLES.borderCredito;
+
+        c6.value = "-";
+        c6.font = EXCEL_STYLES.fontMuted;
+        c6.alignment = { horizontal: "center", vertical: "middle" };
+        c6.border = EXCEL_STYLES.borderBox;
+      } else {
+        // Formatação de DÉBITO em VERMELHO
+        c4.value = "DÉBITO";
+        c4.font = EXCEL_STYLES.fontDebitoBadge;
+        c4.fill = EXCEL_STYLES.fillDebitoBadge;
+        c4.alignment = { horizontal: "center", vertical: "middle" };
+        c4.border = EXCEL_STYLES.borderDebito;
+
+        c5.value = "-";
+        c5.font = EXCEL_STYLES.fontMuted;
+        c5.alignment = { horizontal: "center", vertical: "middle" };
+        c5.border = EXCEL_STYLES.borderBox;
+
+        c6.value = val;
+        c6.numFmt = EXCEL_STYLES.numFmtCurr;
+        c6.font = EXCEL_STYLES.fontDebitoVal;
+        c6.fill = EXCEL_STYLES.fillDebitoCell;
+        c6.alignment = { horizontal: "right", vertical: "middle" };
+        c6.border = EXCEL_STYLES.borderDebito;
+      }
+      ws1.getRow(r).height = 20;
+      r++;
+    }
+
+    // Linha de Totais de Eventos (Proventos x Descontos)
+    ws1.mergeCells(r, 1, r, 4);
+    const cTotL = ws1.getCell(r, 1);
+    cTotL.value = "TOTAIS DE EVENTOS (CRÉDITOS & DÉBITOS):";
+    cTotL.font = EXCEL_STYLES.fontTotaisHeader;
+    cTotL.fill = EXCEL_STYLES.fillTotaisBar;
+    cTotL.alignment = { horizontal: "right", vertical: "middle" };
+    for (let c = 1; c <= 4; c++) ws1.getCell(r, c).border = EXCEL_STYLES.borderBox;
+
+    const cTotProv = ws1.getCell(r, 5);
+    cTotProv.value = somaCred || emp.proventos;
+    cTotProv.numFmt = EXCEL_STYLES.numFmtCurr;
+    cTotProv.font = EXCEL_STYLES.fontCreditoVal;
+    cTotProv.fill = EXCEL_STYLES.fillCreditoBadge;
+    cTotProv.alignment = { horizontal: "right", vertical: "middle" };
+    cTotProv.border = EXCEL_STYLES.borderCredito;
+
+    const cTotDesc = ws1.getCell(r, 6);
+    cTotDesc.value = somaDeb || emp.descontos;
+    cTotDesc.numFmt = EXCEL_STYLES.numFmtCurr;
+    cTotDesc.font = EXCEL_STYLES.fontDebitoVal;
+    cTotDesc.fill = EXCEL_STYLES.fillDebitoBadge;
+    cTotDesc.alignment = { horizontal: "right", vertical: "middle" };
+    cTotDesc.border = EXCEL_STYLES.borderDebito;
+    ws1.getRow(r).height = 22;
+    r++;
+
+    // Linha de Resumo Financeiro & Líquido a Receber
+    ws1.mergeCells(r, 1, r, 3);
+    const cAd = ws1.getCell(r, 1);
+    const adVal = Number(emp.adiantamento_anterior) || 0;
+    cAd.value = `Adiantamento Anterior Compensado: ${formatBRL(adVal)}`;
+    cAd.font = EXCEL_STYLES.fontEmpSub;
+    cAd.fill = EXCEL_STYLES.fillBasesHead;
+    cAd.alignment = { horizontal: "left", vertical: "middle", indent: 1 };
+    for (let c = 1; c <= 3; c++) ws1.getCell(r, c).border = EXCEL_STYLES.borderBox;
+
+    const cLiqL = ws1.getCell(r, 4);
+    cLiqL.value = "VALOR LÍQUIDO:";
+    cLiqL.font = EXCEL_STYLES.fontLiquidoVal;
+    cLiqL.fill = EXCEL_STYLES.fillLiquido;
+    cLiqL.alignment = { horizontal: "right", vertical: "middle" };
+    cLiqL.border = EXCEL_STYLES.borderBox;
+
+    ws1.mergeCells(r, 5, r, 6);
+    const cLiqV = ws1.getCell(r, 5);
+    cLiqV.value = Number(emp.liquido) || 0;
+    cLiqV.numFmt = EXCEL_STYLES.numFmtCurr;
+    cLiqV.font = EXCEL_STYLES.fontLiquidoVal;
+    cLiqV.fill = EXCEL_STYLES.fillLiquido;
+    cLiqV.alignment = { horizontal: "center", vertical: "middle" };
+    for (let c = 5; c <= 6; c++) ws1.getCell(r, c).border = EXCEL_STYLES.borderBox;
+    ws1.getRow(r).height = 24;
+    r++;
+
+    // Quadro de Bases de Cálculo e Encargos
+    const basesItems = [
+      { label: "Salário Base", val: Number(emp.salario) || 0 },
+      { label: "Base INSS Empresa", val: Number(bases.base_inss_empresa) || 0 },
+      { label: "Base INSS Func.", val: Number(bases.base_inss_funcionario) || 0 },
+      { label: "Base FGTS", val: Number(bases.base_fgts) || 0 },
+      { label: "F.G.T.S. Mês (8%)", val: Number(bases.valor_fgts) || 0 },
+      { label: "Base IRRF", val: Number(bases.base_irrf) || 0 }
+    ];
+
+    basesItems.forEach((bItem, bIdx) => {
+      const cellHead = ws1.getCell(r, bIdx + 1);
+      cellHead.value = bItem.label;
+      cellHead.font = { name: "Segoe UI", size: 8, bold: true, color: { argb: "FF64748B" } };
+      cellHead.fill = EXCEL_STYLES.fillBasesHead;
+      cellHead.alignment = { horizontal: "center", vertical: "middle" };
+      cellHead.border = EXCEL_STYLES.borderBox;
+    });
+    ws1.getRow(r).height = 18;
+    r++;
+
+    basesItems.forEach((bItem, bIdx) => {
+      const cellVal = ws1.getCell(r, bIdx + 1);
+      cellVal.value = bItem.val;
+      cellVal.numFmt = EXCEL_STYLES.numFmtCurr;
+      cellVal.font = { name: "Consolas", size: 8, bold: true, color: { argb: "FF334155" } };
+      cellVal.fill = EXCEL_STYLES.fillBasesHead;
+      cellVal.alignment = { horizontal: "center", vertical: "middle" };
+      cellVal.border = EXCEL_STYLES.borderBox;
+    });
+    ws1.getRow(r).height = 18;
+    r += 2; // Espaçamento para o próximo funcionário
+  }
+
+  // =========================================================================
+  // ABA 2: RESUMO GERAL DA FOLHA (Tabela Sintética de Conferência)
+  // =========================================================================
+  if (!isIndividual && employeesList.length > 0) {
+    const ws2 = wb.addWorksheet("Resumo Consolidado", { views: [{ showGridLines: true }] });
+
+    ws2.merge_cells = ws2.mergeCells; // alias
+    ws2.mergeCells(1, 1, 1, 11);
+    const t2 = ws2.getCell(1, 1);
+    t2.value = `RESUMO CONSOLIDADO DA FOLHA - ${empresaNome}`;
+    t2.font = EXCEL_STYLES.fontTitle;
+    t2.fill = EXCEL_STYLES.fillBrand;
+    t2.alignment = { horizontal: "center", vertical: "middle" };
+    ws2.getRow(1).height = 28;
+
+    ws2.mergeCells(2, 1, 2, 11);
+    const sub2 = ws2.getCell(2, 1);
+    sub2.value = `Competência: ${rel.mes_ano || "--"}   |   Período: ${periodoTxt}   |   Total de Colaboradores: ${employeesList.length}`;
+    sub2.font = EXCEL_STYLES.fontSubtitle;
+    sub2.fill = EXCEL_STYLES.fillBrand;
+    sub2.alignment = { horizontal: "center", vertical: "middle" };
+    ws2.getRow(2).height = 20;
+
+    const summaryHeaders = [
+      "Cód.",
+      "Colaborador",
+      "Cargo / Função",
+      "Salário Base (R$)",
+      "Créditos / Proventos (R$)",
+      "Adiantamento Anterior (R$)",
+      "Débitos / Descontos (R$)",
+      "Total Líquido (R$)",
+      "Base INSS (R$)",
+      "Base FGTS (R$)",
+      "FGTS do Mês (R$)"
+    ];
+
+    summaryHeaders.forEach((hTxt, idx) => {
+      const cell = ws2.getCell(4, idx + 1);
+      cell.value = hTxt;
+      cell.font = EXCEL_STYLES.fontTh;
+      cell.fill = EXCEL_STYLES.fillTableHead;
+      cell.alignment = {
+        horizontal: idx === 0 ? "center" : (idx >= 3 ? "right" : "left"),
+        vertical: "middle"
+      };
+      cell.border = EXCEL_STYLES.borderBox;
+    });
+    ws2.getRow(4).height = 24;
+
+    let sRow = 5;
+    for (const emp of employeesList) {
+      const bases = emp.bases || {};
+
+      const cCod = ws2.getCell(sRow, 1);
+      cCod.value = emp.codigo || "-";
+      cCod.alignment = { horizontal: "center", vertical: "middle" };
+
+      const cNome = ws2.getCell(sRow, 2);
+      cNome.value = emp.nome || "";
+      cNome.alignment = { horizontal: "left", vertical: "middle" };
+
+      const cFunc = ws2.getCell(sRow, 3);
+      cFunc.value = emp.funcao || "";
+      cFunc.alignment = { horizontal: "left", vertical: "middle" };
+
+      const cSal = ws2.getCell(sRow, 4);
+      cSal.value = Number(emp.salario) || 0;
+      cSal.numFmt = EXCEL_STYLES.numFmtCurr;
+      cSal.alignment = { horizontal: "right", vertical: "middle" };
+
+      // Proventos em AZUL
+      const cProv = ws2.getCell(sRow, 5);
+      cProv.value = Number(emp.proventos) || 0;
+      cProv.numFmt = EXCEL_STYLES.numFmtCurr;
+      cProv.font = EXCEL_STYLES.fontCreditoVal;
+      cProv.fill = EXCEL_STYLES.fillCreditoCell;
+      cProv.alignment = { horizontal: "right", vertical: "middle" };
+      cProv.border = EXCEL_STYLES.borderCredito;
+
+      const cAd = ws2.getCell(sRow, 6);
+      cAd.value = Number(emp.adiantamento_anterior) || 0;
+      cAd.numFmt = EXCEL_STYLES.numFmtCurr;
+      cAd.alignment = { horizontal: "right", vertical: "middle" };
+
+      // Descontos em VERMELHO
+      const cDesc = ws2.getCell(sRow, 7);
+      cDesc.value = Number(emp.descontos) || 0;
+      cDesc.numFmt = EXCEL_STYLES.numFmtCurr;
+      cDesc.font = EXCEL_STYLES.fontDebitoVal;
+      cDesc.fill = EXCEL_STYLES.fillDebitoCell;
+      cDesc.alignment = { horizontal: "right", vertical: "middle" };
+      cDesc.border = EXCEL_STYLES.borderDebito;
+
+      // Líquido em VERDE
+      const cLiq = ws2.getCell(sRow, 8);
+      cLiq.value = Number(emp.liquido) || 0;
+      cLiq.numFmt = EXCEL_STYLES.numFmtCurr;
+      cLiq.font = EXCEL_STYLES.fontLiquidoVal;
+      cLiq.fill = EXCEL_STYLES.fillLiquido;
+      cLiq.alignment = { horizontal: "right", vertical: "middle" };
+
+      const cBinss = ws2.getCell(sRow, 9);
+      cBinss.value = Number(bases.base_inss_funcionario) || 0;
+      cBinss.numFmt = EXCEL_STYLES.numFmtCurr;
+      cBinss.alignment = { horizontal: "right", vertical: "middle" };
+
+      const cBfgts = ws2.getCell(sRow, 10);
+      cBfgts.value = Number(bases.base_fgts) || 0;
+      cBfgts.numFmt = EXCEL_STYLES.numFmtCurr;
+      cBfgts.alignment = { horizontal: "right", vertical: "middle" };
+
+      const cVfgts = ws2.getCell(sRow, 11);
+      cVfgts.value = Number(bases.valor_fgts) || 0;
+      cVfgts.numFmt = EXCEL_STYLES.numFmtCurr;
+      cVfgts.alignment = { horizontal: "right", vertical: "middle" };
+
+      for (let c = 1; c <= 11; c++) {
+        const cell = ws2.getCell(sRow, c);
+        if (!cell.font) cell.font = EXCEL_STYLES.fontText;
+        if (!cell.border.top) cell.border = EXCEL_STYLES.borderBox;
+      }
+      ws2.getRow(sRow).height = 20;
+      sRow++;
+    }
+
+    // Linha de TOTAIS CONSOLIDADOS
+    ws2.mergeCells(sRow, 1, sRow, 3);
+    const cTotLbl = ws2.getCell(sRow, 1);
+    cTotLbl.value = `TOTAIS CONSOLIDADOS (${employeesList.length} colaboradores)`;
+    cTotLbl.font = EXCEL_STYLES.fontTotaisHeader;
+    cTotLbl.fill = EXCEL_STYLES.fillTotaisBar;
+    cTotLbl.alignment = { horizontal: "right", vertical: "middle" };
+    for (let c = 1; c <= 3; c++) ws2.getCell(sRow, c).border = EXCEL_STYLES.borderBox;
+
+    const summarySums = [
+      { col: 4, val: employeesList.reduce((a, b) => a + (Number(b.salario) || 0), 0) },
+      { col: 5, val: employeesList.reduce((a, b) => a + (Number(b.proventos) || 0), 0), font: EXCEL_STYLES.fontCreditoVal, fill: EXCEL_STYLES.fillCreditoBadge, border: EXCEL_STYLES.borderCredito },
+      { col: 6, val: employeesList.reduce((a, b) => a + (Number(b.adiantamento_anterior) || 0), 0) },
+      { col: 7, val: employeesList.reduce((a, b) => a + (Number(b.descontos) || 0), 0), font: EXCEL_STYLES.fontDebitoVal, fill: EXCEL_STYLES.fillDebitoBadge, border: EXCEL_STYLES.borderDebito },
+      { col: 8, val: employeesList.reduce((a, b) => a + (Number(b.liquido) || 0), 0), font: EXCEL_STYLES.fontLiquidoVal, fill: EXCEL_STYLES.fillLiquido },
+      { col: 9, val: employeesList.reduce((a, b) => a + (Number((b.bases || {}).base_inss_funcionario) || 0), 0) },
+      { col: 10, val: employeesList.reduce((a, b) => a + (Number((b.bases || {}).base_fgts) || 0), 0) },
+      { col: 11, val: employeesList.reduce((a, b) => a + (Number((b.bases || {}).valor_fgts) || 0), 0) }
+    ];
+
+    summarySums.forEach(sumItem => {
+      const cSum = ws2.getCell(sRow, sumItem.col);
+      cSum.value = sumItem.val;
+      cSum.numFmt = EXCEL_STYLES.numFmtCurr;
+      cSum.font = sumItem.font || EXCEL_STYLES.fontTotaisHeader;
+      cSum.fill = sumItem.fill || EXCEL_STYLES.fillTotaisBar;
+      cSum.border = sumItem.border || EXCEL_STYLES.borderBox;
+      cSum.alignment = { horizontal: "right", vertical: "middle" };
+    });
+    ws2.getRow(sRow).height = 24;
+
+    const sCols = [8, 36, 30, 18, 22, 22, 22, 22, 18, 18, 18];
+    sCols.forEach((w, idx) => {
+      ws2.getColumn(idx + 1).width = w;
+    });
+  }
+
+  return wb;
+}
+
+// Exportação Completa de Todos os Colaboradores em Excel (.xlsx)
+async function exportToExcel() {
+  if (!state.currentRelatorio || !state.currentRelatorio.itens) {
+    showToast("Nenhum dado disponível para exportação", "warning");
     return;
   }
 
   const items = getFilteredAndSortedItems();
   const rel = state.currentRelatorio;
 
-  // Montar array de objetos para a planilha
-  const rows = items.map(emp => ({
-    "Empresa": rel.empresa || "",
-    "Período": rel.periodo_texto,
-    "Código": emp.codigo || "",
-    "Nome do Colaborador": emp.nome,
-    "Cargo / Função": emp.funcao || "",
-    "Salário Base (R$)": emp.salario,
-    "Proventos (R$)": emp.proventos,
-    "Adiantamento Anterior (R$)": emp.adiantamento_anterior,
-    "Descontos (R$)": emp.descontos,
-    "Total Líquido (R$)": emp.liquido
-  }));
+  showToast("Gerando planilha Excel com detalhamento completo...", "info");
 
-  // Linha de total geral
-  rows.push({
-    "Empresa": "",
-    "Período": "TOTAL CONSOLIDADO",
-    "Código": "",
-    "Nome do Colaborador": `${items.length} colaboradores`,
-    "Cargo / Função": "",
-    "Salário Base (R$)": items.reduce((a, b) => a + b.salario, 0),
-    "Proventos (R$)": items.reduce((a, b) => a + b.proventos, 0),
-    "Adiantamento Anterior (R$)": items.reduce((a, b) => a + b.adiantamento_anterior, 0),
-    "Descontos (R$)": items.reduce((a, b) => a + b.descontos, 0),
-    "Total Líquido (R$)": items.reduce((a, b) => a + b.liquido, 0)
-  });
+  try {
+    if (typeof ExcelJS !== "undefined") {
+      const wb = await buildExcelReportWorkbook(rel, items, false);
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
 
-  const worksheet = XLSX.utils.json_to_sheet(rows);
+      const safeEmpresa = (rel.empresa || "empresa").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
+      const safeComp = (rel.mes_ano || "periodo").replace(/[^a-zA-Z0-9]/g, "_");
+      const fileName = `relatorio_completo_folha_${safeEmpresa}_${safeComp}.xlsx`;
 
-  // Ajustar largura das colunas
-  worksheet["!cols"] = [
-    { wch: 32 }, // Empresa
-    { wch: 28 }, // Periodo
-    { wch: 10 }, // Codigo
-    { wch: 38 }, // Nome
-    { wch: 32 }, // Cargo
-    { wch: 18 }, // Salario
-    { wch: 18 }, // Proventos
-    { wch: 24 }, // Adiantamento
-    { wch: 18 }, // Descontos
-    { wch: 20 }, // Liquido
-  ];
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
 
-  const workbook = XLSX.utils.book_new();
-  const sheetName = (rel.mes_ano || "Folha").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30);
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      showToast("Planilha Excel completa gerada com sucesso!", "success");
+      return;
+    }
+  } catch (err) {
+    console.warn("Falha no gerador ExcelJS do navegador, utilizando endpoint do servidor:", err);
+  }
 
-  const safeEmpresa = (rel.empresa || "empresa").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
-  const safeComp = (rel.mes_ano || "periodo").replace(/[^a-zA-Z0-9]/g, "_");
-  const safeFileName = `relatorio_folha_${safeEmpresa}_${safeComp}.xlsx`;
-  XLSX.writeFile(workbook, safeFileName);
-  showToast("Planilha Excel gerada com sucesso!", "success");
+  // Fallback transparente para o gerador Python openpyxl no servidor
+  if (state.currentPeriodoId) {
+    window.location.href = `/api/export/excel/${state.currentPeriodoId}`;
+    showToast("Download da planilha Excel iniciado!", "success");
+  } else {
+    showToast("Erro ao gerar planilha Excel", "error");
+  }
+}
+
+// Exportação do Holerite Individual de um Colaborador em Excel (.xlsx)
+async function exportIndividualHoleriteExcel(emp) {
+  if (!emp) return;
+  const rel = state.currentRelatorio || {};
+
+  showToast(`Gerando Excel do holerite de ${emp.nome}...`, "info");
+
+  try {
+    if (typeof ExcelJS !== "undefined") {
+      const wb = await buildExcelReportWorkbook(rel, [emp], true);
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+
+      const safeEmp = (emp.nome || "colaborador").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 25);
+      const safeComp = (rel.mes_ano || "periodo").replace(/[^a-zA-Z0-9]/g, "_");
+      const fileName = `holerite_${safeEmp}_${safeComp}.xlsx`;
+
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      showToast(`Holerite de ${emp.nome} exportado com sucesso!`, "success");
+      return;
+    }
+  } catch (err) {
+    console.error("Erro ao exportar holerite individual:", err);
+    showToast("Erro ao exportar holerite individual", "error");
+  }
 }
 
 // Funções do Modal de Holerite Individual Detalhado
