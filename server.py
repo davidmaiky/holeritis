@@ -301,6 +301,31 @@ class HoleriteRequestHandler(SimpleHTTPRequestHandler):
                 self._send_error(500, f"Erro ao obter período: {str(e)}")
             return
 
+        # Rota de Comparativo de Recibo (OBS / Comparativo com o Recibo Anterior)
+        if path == "/api/comparativo-recibo":
+            if not self._require_auth():
+                return
+            periodo_id_str = query.get("periodo_id", [None])[0]
+            if not periodo_id_str or not periodo_id_str.isdigit():
+                self._send_error(400, "Parâmetro 'periodo_id' é obrigatório.")
+                return
+            periodo_id = int(periodo_id_str)
+            item_id_str = query.get("item_id", [None])[0]
+            item_id = int(item_id_str) if item_id_str and item_id_str.isdigit() else None
+            codigo = query.get("codigo", [None])[0]
+            nome = query.get("nome", [None])[0]
+
+            try:
+                comp = database.obter_comparativo_recibo(periodo_id, item_id=item_id, codigo=codigo, nome=nome)
+                if not comp:
+                    self._send_error(404, "Colaborador ou período não localizado.")
+                else:
+                    self._send_json(200, {"success": True, "comparativo": comp})
+            except Exception as e:
+                self._send_error(500, f"Erro ao gerar comparativo de recibo: {str(e)}")
+            return
+
+
         # 10. Rota de Exportação CSV
         match_csv = re.match(r"^/api/export/csv/(\d+)$", path)
         if match_csv:

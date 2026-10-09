@@ -715,6 +715,7 @@
                 <th class="col-num text-right">Descontos</th>
                 <th class="col-num text-right">Total Líquido</th>
                 <th class="col-actions text-center">Recibo</th>
+                <th class="col-obs text-center">OBS</th>
               </tr>
             </thead>
             <tbody id="table-body">
@@ -728,6 +729,7 @@
                 <td id="foot-adiantamento" class="col-num text-right font-mono text-bold text-amber">R$ 0,00</td>
                 <td id="foot-descontos" class="col-num text-right font-mono text-bold text-danger">R$ 0,00</td>
                 <td id="foot-liquido" class="col-num text-right font-mono text-bold text-success">R$ 0,00</td>
+                <td></td>
                 <td></td>
               </tr>
             </tfoot>
@@ -906,6 +908,177 @@
           Imprimir Recibo Individual
         </button>
         <button id="btn-close-modal-bottom" class="btn btn-primary" type="button">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       MODAL: OBSERVAÇÕES COMPARATIVAS DE RECIBO (OBS / COMPARATIVO)
+       ======================================================== -->
+  <div id="modal-comparativo" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-comp-title">
+    <div class="modal-card comparativo-modal-card">
+      <div class="modal-header">
+        <div class="modal-header-info">
+          <div class="modal-header-icon-box comp-icon-box">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M16 3h5v5"></path>
+              <path d="M4 20L21 3"></path>
+              <path d="M21 16v5h-5"></path>
+              <path d="M15 15l6 6"></path>
+              <path d="M4 4l5 5"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="comp-title-badges">
+              <span class="badge badge-primary">Auditoria de Folha</span>
+              <span class="badge badge-info" id="comp-periodo-badge">Período Atual vs Anterior</span>
+            </div>
+            <h3 id="modal-comp-title">Observações Comparativas de Recibo</h3>
+            <p id="modal-comp-sub" class="modal-comp-subtitle">Análise detalhada de alterações, créditos e débitos adicionados ou removidos</p>
+          </div>
+        </div>
+        <button id="btn-close-comp-modal" class="btn-close" aria-label="Fechar">&times;</button>
+      </div>
+
+      <div class="modal-body modal-body-scroll" id="comp-modal-body">
+        <!-- Ficha do Colaborador -->
+        <div class="holerite-employee-card comp-emp-card">
+          <div class="emp-avatar-placeholder">👤</div>
+          <div class="emp-card-details">
+            <div class="emp-card-header-row">
+              <h4 id="comp-emp-nome">NOME DO COLABORADOR</h4>
+              <span id="comp-emp-codigo-badge" class="badge-code">Cód: --</span>
+            </div>
+            <div class="emp-meta-tags">
+              <span id="comp-emp-funcao" class="meta-tag">Cargo: --</span>
+              <span id="comp-emp-empresa" class="meta-tag">Empresa: --</span>
+              <span id="comp-emp-periodo-atual" class="meta-tag meta-tag-current">Atual: --</span>
+              <span id="comp-emp-periodo-ant" class="meta-tag meta-tag-prev">Anterior: --</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Estado Inicial: Sem Recibo Anterior -->
+        <div id="comp-no-previous" class="comp-empty-banner hidden">
+          <div class="comp-empty-icon">📌</div>
+          <div>
+            <h4>Primeiro Recibo Registrado</h4>
+            <p id="comp-no-previous-msg">Este colaborador não possui recibo anterior cadastrado para comparação nesta empresa. Todos os valores atuais refletem a competência inicial.</p>
+          </div>
+        </div>
+
+        <!-- Conteúdo do Comparativo quando há recibo anterior -->
+        <div id="comp-content-area">
+          <!-- Alertas e Possíveis Esquecimentos -->
+          <div class="comp-section">
+            <div class="comp-section-header">
+              <h5>🔔 Diagnóstico Inteligente & Alertas</h5>
+              <span class="section-badge-counter" id="comp-alerts-count">0 alertas</span>
+            </div>
+            <div id="comp-alerts-container" class="comp-alerts-grid">
+              <!-- Cards de alertas inseridos dinamicamente via JS -->
+            </div>
+          </div>
+
+          <!-- Cards Comparativos de Totais -->
+          <div class="comp-section">
+            <div class="comp-section-header">
+              <h5>📊 Comparativo Consolidado de Valores</h5>
+              <span class="bases-hint-text">Recibo Anterior ➔ Recibo Atual</span>
+            </div>
+            <div class="comp-kpis-grid">
+              <div class="comp-kpi-card" id="kpi-card-salario">
+                <span class="comp-kpi-label">Salário Base</span>
+                <div class="comp-kpi-flow">
+                  <span class="comp-val-prev font-mono" id="comp-sal-ant">R$ 0,00</span>
+                  <span class="comp-flow-arrow">➔</span>
+                  <span class="comp-val-curr font-mono" id="comp-sal-curr">R$ 0,00</span>
+                </div>
+                <div class="comp-kpi-diff" id="comp-sal-diff">--</div>
+              </div>
+
+              <div class="comp-kpi-card" id="kpi-card-proventos">
+                <span class="comp-kpi-label">Total Proventos (Créditos)</span>
+                <div class="comp-kpi-flow">
+                  <span class="comp-val-prev font-mono" id="comp-prov-ant">R$ 0,00</span>
+                  <span class="comp-flow-arrow">➔</span>
+                  <span class="comp-val-curr font-mono" id="comp-prov-curr">R$ 0,00</span>
+                </div>
+                <div class="comp-kpi-diff" id="comp-prov-diff">--</div>
+              </div>
+
+              <div class="comp-kpi-card" id="kpi-card-descontos">
+                <span class="comp-kpi-label">Total Descontos (Débitos)</span>
+                <div class="comp-kpi-flow">
+                  <span class="comp-val-prev font-mono" id="comp-desc-ant">R$ 0,00</span>
+                  <span class="comp-flow-arrow">➔</span>
+                  <span class="comp-val-curr font-mono" id="comp-desc-curr">R$ 0,00</span>
+                </div>
+                <div class="comp-kpi-diff" id="comp-desc-diff">--</div>
+              </div>
+
+              <div class="comp-kpi-card comp-kpi-card-liquido" id="kpi-card-liquido">
+                <span class="comp-kpi-label">Total Líquido a Receber</span>
+                <div class="comp-kpi-flow">
+                  <span class="comp-val-prev font-mono" id="comp-liq-ant">R$ 0,00</span>
+                  <span class="comp-flow-arrow">➔</span>
+                  <span class="comp-val-curr font-mono text-bold" id="comp-liq-curr">R$ 0,00</span>
+                </div>
+                <div class="comp-kpi-diff text-bold" id="comp-liq-diff">--</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabela Comparativa Detalhada de Rubricas -->
+          <div class="comp-section">
+            <div class="comp-section-header comp-table-header">
+              <div>
+                <h5>📋 Detalhamento de Rubricas (Créditos e Débitos)</h5>
+                <span class="bases-hint-text">Identificação de itens novos, ausentes/esquecidos e com valores alterados</span>
+              </div>
+              <div class="comp-filter-pills" id="comp-filter-pills">
+                <button type="button" class="comp-pill active" data-filter="all">Todos (<span id="count-all">0</span>)</button>
+                <button type="button" class="comp-pill" data-filter="changes">Apenas Mudanças (<span id="count-changes">0</span>)</button>
+                <button type="button" class="comp-pill" data-filter="proventos">Créditos / Proventos (<span id="count-prov">0</span>)</button>
+                <button type="button" class="comp-pill" data-filter="descontos">Débitos / Descontos (<span id="count-desc">0</span>)</button>
+              </div>
+            </div>
+
+            <div class="table-container comp-table-wrapper">
+              <table class="data-table comp-events-table">
+                <thead>
+                  <tr>
+                    <th class="col-cod text-center">Cód</th>
+                    <th class="col-desc">Rubrica / Descrição</th>
+                    <th class="col-tipo text-center">Tipo</th>
+                    <th class="col-ant text-right">Anterior (<span id="th-prev-comp">Mês Ant.</span>)</th>
+                    <th class="col-curr text-right">Atual (<span id="th-curr-comp">Mês Atual</span>)</th>
+                    <th class="col-diff text-right">Diferença (R$)</th>
+                    <th class="col-status text-center">Situação / Status</th>
+                  </tr>
+                </thead>
+                <tbody id="comp-events-tbody">
+                  <!-- Linhas preenchidas via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-print-comparativo" class="btn btn-secondary" type="button">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Imprimir Comparativo
+        </button>
+        <button id="btn-open-recibo-from-comp" class="btn btn-secondary" type="button">
+          📄 Ver Recibo Completo
+        </button>
+        <button id="btn-close-comp-modal-bottom" class="btn btn-primary" type="button">Fechar</button>
       </div>
     </div>
   </div>

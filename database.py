@@ -648,3 +648,417 @@ def gerar_folhas_demo_12m(empresa_alvo=None):
 
     conn.close()
     return novos_adicionados
+
+def obter_comparativo_recibo(periodo_id, item_id=None, codigo=None, nome=None):
+    """
+    Compara o recibo de um colaborador no período atual com o seu recibo no período imediatamente anterior da mesma empresa.
+    Detecta e detalha:
+    - Créditos/proventos novos ou removidos (ex: bonificação, férias, horas extras)
+    - Débitos/descontos novos ou removidos (ex: plano de saúde ou vale transporte que estava no anterior e foi esquecido no atual)
+    - Rubricas com valores ou referências alteradas
+    - Variação nos totais de Salário Base, Proventos, Descontos, Adiantamento e Líquido
+    - Alertas inteligentes de possíveis esquecimentos de descontos ou novidades na folha
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # 1. Obter período atual
+    cursor.execute("SELECT * FROM periodos WHERE id = ?", (periodo_id,))
+    p_atual_row = cursor.fetchone()
+    if not p_atual_row:
+        conn.close()
+        return None
+    p_atual = dict(p_atual_row)
+
+    # 2. Obter item do funcionário no período atual
+    item_atual = None
+    if item_id:
+        cursor.execute("SELECT * FROM relatorio_itens WHERE id = ? AND periodo_id = ?", (item_id, periodo_id))
+        r = cursor.fetchone()
+        if r:
+            item_atual = dict(r)
+
+    if not item_atual and codigo:
+        cursor.execute("SELECT * FROM relatorio_itens WHERE periodo_id = ? AND TRIM(codigo) = TRIM(?)", (periodo_id, str(codigo)))
+        r = cursor.fetchone()
+        if r:
+            item_atual = dict(r)
+
+    if not item_atual and nome:
+        cursor.execute("SELECT * FROM relatorio_itens WHERE periodo_id = ? AND LOWER(TRIM(nome)) = LOWER(TRIM(?))", (periodo_id, str(nome)))
+        r = cursor.fetchone()
+        if r:
+            item_atual = dict(r)
+
+    if not item_atual:
+        conn.close()
+        return None
+
+    # Parsear campos JSON do item atual
+    for k in ["eventos", "bases", "dados_adicionais"]:
+        if item_atual.get(k):
+            try:
+                item_atual[k] = json.loads(item_atual[k])
+            except Exception:
+                item_atual[k] = [] if k == "eventos" else {}
+        else:
+            item_atual[k] = [] if k == "eventos" else {}
+
+    empresa_atual = (p_atual.get("empresa") or "").strip()
+    cnpj_atual = (p_atual.get("cnpj") or "").strip()
+    chave_atual = competencia_para_chave(p_atual.get("mes_ano"))
+    emp_codigo = (item_atual.get("codigo") or "").strip()
+    emp_nome = (item_atual.get("nome") or "").strip()
+
+    # 3. Buscar períodos candidatos da mesma empresa
+    cursor.execute("SELECT * FROM periodos WHERE id != ? ORDER BY id DESC", (periodo_id,))
+    candidatos_periodos = [dict(r) for r in cursor.fetchall()]
+
+    def mesma_empresa(p):
+        if cnpj_atual and p.get("cnpj") and p.get("cnpj").strip() == cnpj_atual:
+            return True
+        if empresa_atual and p.get("empresa"):
+            return p.get("empresa").strip().lower() == empresa_atual.lower()
+        return False
+
+    candidatos_periodos = [p for p in candidatos_periodos if mesma_empresa(p)]
+
+    # Filtrar períodos que sejam cronologicamente anteriores
+    anteriores = []
+    for p in candidatos_periodos:
+        chave_p = competencia_para_chave(p.get("mes_ano"))
+        if chave_atual > 0 and chave_p > 0:
+            if chave_p < chave_atual:
+                anteriores.append((chave_p, p["id"], p))
+        elif p["id"] < periodo_id:
+            anteriores.append((chave_p, p["id"], p))
+
+    # Ordenar pelos mais recentes anteriores primeiro (maior competência, maior ID)
+    anteriores.sort(key=lambda x: (x[0], x[1]), reverse=True)
+
+    # 4. Encontrar o recibo do funcionário no período anterior mais imediato
+    item_anterior = None
+    periodo_anterior = None
+
+    for _, _, cand_p in anteriores:
+        r_ant = None
+        if emp_codigo:
+            cursor.execute("""
+                SELECT * FROM relatorio_itens 
+                WHERE periodo_id = ? AND TRIM(codigo) = TRIM(?)
+                LIMIT 1
+            """, (cand_p["id"], emp_codigo))
+            r_ant = cursor.fetchone()
+
+        if not r_ant and emp_nome:
+            cursor.execute("""
+                SELECT * FROM relatorio_itens 
+                WHERE periodo_id = ? AND LOWER(TRIM(nome)) = LOWER(TRIM(?))
+                LIMIT 1
+            """, (cand_p["id"], emp_nome))
+            r_ant = cursor.fetchone()
+
+        if r_ant:
+            item_anterior = dict(r_ant)
+            periodo_anterior = cand_p
+            break
+
+    conn.close()
+
+    # Se não houver recibo anterior registrado
+    if not item_anterior:
+        return {
+            "tem_recibo_anterior": False,
+            "mensagem": "Este é o primeiro recibo registrado para este colaborador no sistema nesta empresa. Não há recibo anterior para comparação comparativa.",
+            "funcionario": {
+                "id": item_atual.get("id"),
+                "codigo": emp_codigo,
+                "nome": emp_nome,
+                "funcao": item_atual.get("funcao", "")
+            },
+            "periodo_atual": {
+                "id": p_atual.get("id"),
+                "mes_ano": p_atual.get("mes_ano"),
+                "periodo_texto": p_atual.get("periodo_texto"),
+                "empresa": empresa_atual
+            },
+            "item_atual": item_atual
+        }
+
+    # Parsear campos JSON do item anterior
+    for k in ["eventos", "bases", "dados_adicionais"]:
+        if item_anterior.get(k):
+            try:
+                item_anterior[k] = json.loads(item_anterior[k])
+            except Exception:
+                item_anterior[k] = [] if k == "eventos" else {}
+        else:
+            item_anterior[k] = [] if k == "eventos" else {}
+
+    # 5. Comparação Detalhada de Rubricas / Eventos
+    evs_atual = item_atual.get("eventos") or []
+    evs_ant = item_anterior.get("eventos") or []
+
+    def chave_evento(e):
+        cod = str(e.get("codigo", "")).strip()
+        if cod and cod != "None":
+            return f"cod_{cod}"
+        desc = (e.get("descricao") or "").strip().lower()
+        return f"desc_{desc}"
+
+    map_ant = {chave_evento(e): e for e in evs_ant}
+    map_atual = {chave_evento(e): e for e in evs_atual}
+    chaves_todas = list(dict.fromkeys(list(map_ant.keys()) + list(map_atual.keys())))
+
+    proventos_adicionados = []
+    proventos_removidos = []
+    proventos_alterados = []
+    proventos_iguais = []
+
+    descontos_adicionados = []
+    descontos_removidos = []
+    descontos_alterados = []
+    descontos_iguais = []
+
+    for k in chaves_todas:
+        no_ant = map_ant.get(k)
+        no_atual = map_atual.get(k)
+
+        if no_ant and not no_atual:
+            # Rubrica existia no mês anterior e NÃO está no atual (Removida)
+            tipo = no_ant.get("tipo", "provento")
+            diff_item = {
+                "codigo": no_ant.get("codigo", ""),
+                "descricao": no_ant.get("descricao", ""),
+                "tipo": tipo,
+                "referencia_anterior": no_ant.get("referencia", ""),
+                "valor_anterior": round(no_ant.get("valor", 0.0), 2),
+                "referencia_atual": "-",
+                "valor_atual": 0.0,
+                "diferenca": round(-no_ant.get("valor", 0.0), 2),
+                "status": "removido"
+            }
+            if tipo == "provento":
+                proventos_removidos.append(diff_item)
+            else:
+                descontos_removidos.append(diff_item)
+
+        elif not no_ant and no_atual:
+            # Rubrica NÃO existia no mês anterior e ESTÁ no atual (Nova / Adicionada)
+            tipo = no_atual.get("tipo", "provento")
+            diff_item = {
+                "codigo": no_atual.get("codigo", ""),
+                "descricao": no_atual.get("descricao", ""),
+                "tipo": tipo,
+                "referencia_anterior": "-",
+                "valor_anterior": 0.0,
+                "referencia_atual": no_atual.get("referencia", ""),
+                "valor_atual": round(no_atual.get("valor", 0.0), 2),
+                "diferenca": round(no_atual.get("valor", 0.0), 2),
+                "status": "adicionado"
+            }
+            if tipo == "provento":
+                proventos_adicionados.append(diff_item)
+            else:
+                descontos_adicionados.append(diff_item)
+
+        else:
+            # Presente em ambos
+            tipo = no_atual.get("tipo", no_ant.get("tipo", "provento"))
+            val_ant = round(no_ant.get("valor", 0.0), 2)
+            val_at = round(no_atual.get("valor", 0.0), 2)
+            ref_ant = str(no_ant.get("referencia", "")).strip()
+            ref_at = str(no_atual.get("referencia", "")).strip()
+            diff = round(val_at - val_ant, 2)
+            mudou = (abs(diff) > 0.005) or (ref_ant != ref_at and ref_ant != "" and ref_at != "")
+
+            diff_item = {
+                "codigo": no_atual.get("codigo") or no_ant.get("codigo", ""),
+                "descricao": no_atual.get("descricao") or no_ant.get("descricao", ""),
+                "tipo": tipo,
+                "referencia_anterior": ref_ant,
+                "valor_anterior": val_ant,
+                "referencia_atual": ref_at,
+                "valor_atual": val_at,
+                "diferenca": diff,
+                "status": "alterado" if mudou else "igual"
+            }
+            if tipo == "provento":
+                if mudou:
+                    proventos_alterados.append(diff_item)
+                else:
+                    proventos_iguais.append(diff_item)
+            else:
+                if mudou:
+                    descontos_alterados.append(diff_item)
+                else:
+                    descontos_iguais.append(diff_item)
+
+    # 6. Totais comparativos
+    def calc_tot(ant, at):
+        ant = round(ant or 0.0, 2)
+        at = round(at or 0.0, 2)
+        diff = round(at - ant, 2)
+        pct = round((diff / ant * 100), 2) if ant > 0 else 0.0
+        return {"anterior": ant, "atual": at, "diferenca": diff, "percentual": pct}
+
+    totais = {
+        "salario": calc_tot(item_anterior.get("salario"), item_atual.get("salario")),
+        "proventos": calc_tot(item_anterior.get("proventos"), item_atual.get("proventos")),
+        "adiantamento": calc_tot(item_anterior.get("adiantamento_anterior"), item_atual.get("adiantamento_anterior")),
+        "descontos": calc_tot(item_anterior.get("descontos"), item_atual.get("descontos")),
+        "liquido": calc_tot(item_anterior.get("liquido"), item_atual.get("liquido"))
+    }
+
+    # 7. Geração de Alertas e Auditoria Sintética
+    alertas = []
+
+    # A) CRÍTICO: Débito / Desconto que estava no anterior e sumiu no atual (Ex: Plano de Saúde esquecido!)
+    if descontos_removidos:
+        for d in descontos_removidos:
+            desc_upper = d["descricao"].upper()
+            palavras_criticas = [
+                "SAUDE", "SAÚDE", "MEDIC", "MÉDIC", "ODONTO", "CONVENIO", "CONVÊNIO", 
+                "SEGURO", "VALE", "VT", "TRANSPORTE", "EMPRESTIMO", "EMPRÉSTIMO", 
+                "PENSAO", "PENSÃO", "SINDICATO", "FARMACIA", "FARMÁCIA", "ALIMENTA"
+            ]
+            eh_critico = any(p in desc_upper for p in palavras_criticas)
+            if eh_critico:
+                alertas.append({
+                    "tipo": "warning",
+                    "badge": "⚠️ POSSÍVEL ESQUECIMENTO",
+                    "titulo": f"Desconto '{d['descricao']}' ausente neste recibo",
+                    "mensagem": f"O colaborador possuía o desconto de R$ {d['valor_anterior']:.2f} ({d['descricao']}) no recibo anterior ({periodo_anterior.get('mes_ano')}), mas ele NÃO consta no recibo atual ({p_atual.get('mes_ano')}). Verifique se foi esquecido de ser lançado ou se a cessação foi intencional."
+                })
+
+        outros_desc = [
+            d for d in descontos_removidos 
+            if not any(p in d["descricao"].upper() for p in [
+                "SAUDE", "SAÚDE", "MEDIC", "MÉDIC", "ODONTO", "CONVENIO", "CONVÊNIO", 
+                "SEGURO", "VALE", "VT", "TRANSPORTE", "EMPRESTIMO", "EMPRÉSTIMO", 
+                "PENSAO", "PENSÃO", "SINDICATO", "FARMACIA", "FARMÁCIA", "ALIMENTA"
+            ])
+        ]
+        if outros_desc:
+            nomes = ", ".join(f"'{d['descricao']}' (R$ {d['valor_anterior']:.2f})" for d in outros_desc)
+            alertas.append({
+                "tipo": "warning",
+                "badge": "DÉBITO(S) REMOVIDO(S)",
+                "titulo": "Desconto(s) anterior(es) não repetido(s)",
+                "mensagem": f"Rubricas de desconto presentes em {periodo_anterior.get('mes_ano')} que não constam neste mês: {nomes}."
+            })
+
+    # B) Novos Créditos / Proventos adicionados
+    if proventos_adicionados:
+        for p in proventos_adicionados:
+            desc_upper = p["descricao"].upper()
+            if any(w in desc_upper for w in ["FERIA", "FÉRIA", "1/3"]):
+                badge_lbl = "🏖️ FÉRIAS CREDITADAS"
+            elif any(w in desc_upper for w in ["BONIF", "GRATIF", "PREMIO", "PRÊMIO", "COMIS"]):
+                badge_lbl = "⭐ BONIFICAÇÃO / PRÊMIO"
+            elif any(w in desc_upper for w in ["HORA EXTRA", "EXTRA", "HE"]):
+                badge_lbl = "⏱️ HORAS EXTRAS"
+            elif any(w in desc_upper for w in ["13", "DÉCIMO", "DECIMO"]):
+                badge_lbl = "🎁 13º SALÁRIO"
+            else:
+                badge_lbl = "✨ NOVO CRÉDITO"
+
+            alertas.append({
+                "tipo": "success",
+                "badge": badge_lbl,
+                "titulo": f"Novo Provento: {p['descricao']}",
+                "mensagem": f"Foi adicionado neste recibo o provento '{p['descricao']}' no valor de R$ {p['valor_atual']:.2f}."
+            })
+
+    # C) Novos Descontos adicionados
+    if descontos_adicionados:
+        for d in descontos_adicionados:
+            alertas.append({
+                "tipo": "danger",
+                "badge": "🛑 NOVO DÉBITO",
+                "titulo": f"Novo Desconto: {d['descricao']}",
+                "mensagem": f"Foi incluído neste recibo um novo desconto de R$ {d['valor_atual']:.2f} ({d['descricao']})."
+            })
+
+    # D) Proventos que cessaram
+    if proventos_removidos:
+        nomes = ", ".join(f"'{p['descricao']}' (R$ {p['valor_anterior']:.2f})" for p in proventos_removidos)
+        alertas.append({
+            "tipo": "info",
+            "badge": "ℹ️ CRÉDITO CESSADO",
+            "titulo": "Provento(s) do mês anterior ausente(s)",
+            "mensagem": f"Não se repetiram neste mês os seguintes créditos de {periodo_anterior.get('mes_ano')}: {nomes}."
+        })
+
+    # E) Alteração no Salário Base
+    if abs(totais["salario"]["diferenca"]) > 0.01:
+        sinal = "+" if totais["salario"]["diferenca"] > 0 else ""
+        alertas.append({
+            "tipo": "primary",
+            "badge": "💼 SALÁRIO BASE ALTERADO",
+            "titulo": "Alteração no Salário Contratual",
+            "mensagem": f"Salário base alterado de R$ {totais['salario']['anterior']:.2f} para R$ {totais['salario']['atual']:.2f} ({sinal}R$ {totais['salario']['diferenca']:.2f} / {sinal}{totais['salario']['percentual']:.1f}%)."
+        })
+
+    # F) Variação Líquida expressiva
+    if abs(totais["liquido"]["diferenca"]) > 0.01:
+        sinal = "+" if totais["liquido"]["diferenca"] > 0 else ""
+        alertas.append({
+            "tipo": "info",
+            "badge": "💵 LÍQUIDO A RECEBER",
+            "titulo": "Variação no Valor Líquido",
+            "mensagem": f"Valor líquido a receber variou de R$ {totais['liquido']['anterior']:.2f} para R$ {totais['liquido']['atual']:.2f} ({sinal}R$ {totais['liquido']['diferenca']:.2f} / {sinal}{totais['liquido']['percentual']:.1f}%)."
+        })
+
+    total_mudancas = (
+        len(proventos_adicionados) + len(proventos_removidos) + len(proventos_alterados) +
+        len(descontos_adicionados) + len(descontos_removidos) + len(descontos_alterados)
+    )
+
+    if total_mudancas == 0 and abs(totais["liquido"]["diferenca"]) < 0.01:
+        alertas.append({
+            "tipo": "success",
+            "badge": "✅ RECIBOS IDÊNTICOS",
+            "titulo": "Sem alterações na composição",
+            "mensagem": f"Todos os créditos, débitos e valores contratuais são exatamente iguais aos de {periodo_anterior.get('mes_ano')}."
+        })
+
+    return {
+        "tem_recibo_anterior": True,
+        "funcionario": {
+            "id": item_atual.get("id"),
+            "codigo": emp_codigo,
+            "nome": emp_nome,
+            "funcao": item_atual.get("funcao", "")
+        },
+        "periodo_atual": {
+            "id": p_atual.get("id"),
+            "mes_ano": p_atual.get("mes_ano"),
+            "periodo_texto": p_atual.get("periodo_texto"),
+            "empresa": empresa_atual
+        },
+        "periodo_anterior": {
+            "id": periodo_anterior.get("id"),
+            "mes_ano": periodo_anterior.get("mes_ano"),
+            "periodo_texto": periodo_anterior.get("periodo_texto"),
+            "empresa": periodo_anterior.get("empresa")
+        },
+        "totais": totais,
+        "total_mudancas": total_mudancas,
+        "alertas": alertas,
+        "proventos": {
+            "adicionados": proventos_adicionados,
+            "removidos": proventos_removidos,
+            "alterados": proventos_alterados,
+            "iguais": proventos_iguais
+        },
+        "descontos": {
+            "adicionados": descontos_adicionados,
+            "removidos": descontos_removidos,
+            "alterados": descontos_alterados,
+            "iguais": descontos_iguais
+        },
+        "item_atual": item_atual,
+        "item_anterior": item_anterior
+    }
+

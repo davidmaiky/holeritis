@@ -42,7 +42,10 @@ const state = {
   chartComposicao: null,
   chartTopSalarios: null,
   chartEvolucaoHeadcount: null,
-  currentModalEmployee: null
+  currentModalEmployee: null,
+  currentComparativoData: null,
+  currentComparativoEmployee: null,
+  currentCompFilter: "all"
 };
 
 // Interceptor Global de Fetch para envio de Token e Detecção de 401
@@ -292,7 +295,47 @@ const dom = {
   perfilNovaSenha: document.getElementById("perfil-nova-senha"),
   perfilConfirmaSenha: document.getElementById("perfil-confirma-senha"),
   perfilErrorAlert: document.getElementById("perfil-error-alert"),
-  spinnerSalvarPerfil: document.getElementById("spinner-salvar-perfil")
+  spinnerSalvarPerfil: document.getElementById("spinner-salvar-perfil"),
+
+  // Modal de Observações Comparativas (OBS)
+  modalComparativo: document.getElementById("modal-comparativo"),
+  btnCloseCompModal: document.getElementById("btn-close-comp-modal"),
+  btnCloseCompModalBottom: document.getElementById("btn-close-comp-modal-bottom"),
+  btnPrintComparativo: document.getElementById("btn-print-comparativo"),
+  btnOpenReciboFromComp: document.getElementById("btn-open-recibo-from-comp"),
+  compModalBody: document.getElementById("comp-modal-body"),
+  compEmpNome: document.getElementById("comp-emp-nome"),
+  compEmpCodigoBadge: document.getElementById("comp-emp-codigo-badge"),
+  compEmpFuncao: document.getElementById("comp-emp-funcao"),
+  compEmpEmpresa: document.getElementById("comp-emp-empresa"),
+  compEmpPeriodoAtual: document.getElementById("comp-emp-periodo-atual"),
+  compEmpPeriodoAnt: document.getElementById("comp-emp-periodo-ant"),
+  compPeriodoBadge: document.getElementById("comp-periodo-badge"),
+  compNoPrevious: document.getElementById("comp-no-previous"),
+  compNoPreviousMsg: document.getElementById("comp-no-previous-msg"),
+  compContentArea: document.getElementById("comp-content-area"),
+  compAlertsCount: document.getElementById("comp-alerts-count"),
+  compAlertsContainer: document.getElementById("comp-alerts-container"),
+  compSalAnt: document.getElementById("comp-sal-ant"),
+  compSalCurr: document.getElementById("comp-sal-curr"),
+  compSalDiff: document.getElementById("comp-sal-diff"),
+  compProvAnt: document.getElementById("comp-prov-ant"),
+  compProvCurr: document.getElementById("comp-prov-curr"),
+  compProvDiff: document.getElementById("comp-prov-diff"),
+  compDescAnt: document.getElementById("comp-desc-ant"),
+  compDescCurr: document.getElementById("comp-desc-curr"),
+  compDescDiff: document.getElementById("comp-desc-diff"),
+  compLiqAnt: document.getElementById("comp-liq-ant"),
+  compLiqCurr: document.getElementById("comp-liq-curr"),
+  compLiqDiff: document.getElementById("comp-liq-diff"),
+  compEventsTbody: document.getElementById("comp-events-tbody"),
+  compFilterPills: document.getElementById("comp-filter-pills"),
+  countAll: document.getElementById("count-all"),
+  countChanges: document.getElementById("count-changes"),
+  countProv: document.getElementById("count-prov"),
+  countDesc: document.getElementById("count-desc"),
+  thPrevComp: document.getElementById("th-prev-comp"),
+  thCurrComp: document.getElementById("th-curr-comp")
 };
 
 // Formatação Monetária Brasileira
@@ -1282,10 +1325,41 @@ function setupEventListeners() {
     });
   }
 
-  // Tecla ESC para fechar modal
+  // Modal de Observações Comparativas (OBS)
+  if (dom.btnCloseCompModal) dom.btnCloseCompModal.addEventListener("click", closeComparativoModal);
+  if (dom.btnCloseCompModalBottom) dom.btnCloseCompModalBottom.addEventListener("click", closeComparativoModal);
+  if (dom.modalComparativo) {
+    dom.modalComparativo.addEventListener("click", (e) => {
+      if (e.target === dom.modalComparativo) closeComparativoModal();
+    });
+  }
+  if (dom.btnPrintComparativo) dom.btnPrintComparativo.addEventListener("click", printComparativo);
+  if (dom.btnOpenReciboFromComp) {
+    dom.btnOpenReciboFromComp.addEventListener("click", () => {
+      const emp = state.currentComparativoEmployee;
+      closeComparativoModal();
+      if (emp) openHoleriteModal(emp);
+    });
+  }
+  if (dom.compFilterPills) {
+    dom.compFilterPills.addEventListener("click", (e) => {
+      const btn = e.target.closest(".comp-pill");
+      if (!btn) return;
+      dom.compFilterPills.querySelectorAll(".comp-pill").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      state.currentCompFilter = btn.dataset.filter || "all";
+      renderComparativoTable();
+    });
+  }
+
+  // Tecla ESC para fechar modais
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && dom.modalHolerite && !dom.modalHolerite.classList.contains("hidden")) {
-      closeHoleriteModal();
+    if (e.key === "Escape") {
+      if (dom.modalComparativo && !dom.modalComparativo.classList.contains("hidden")) {
+        closeComparativoModal();
+      } else if (dom.modalHolerite && !dom.modalHolerite.classList.contains("hidden")) {
+        closeHoleriteModal();
+      }
     }
   });
 
@@ -1921,7 +1995,28 @@ function renderTable() {
           📄 Recibo
         </button>
       </td>
+      <td class="col-obs">
+        <button class="btn-action-obs" type="button" title="Ver Observações e Mudanças Comparativas com o Recibo Anterior">
+          👁️ VER
+        </button>
+      </td>
     `;
+
+    const btnRecibo = tr.querySelector(".btn-action-view");
+    if (btnRecibo) {
+      btnRecibo.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openHoleriteModal(emp);
+      });
+    }
+
+    const btnObs = tr.querySelector(".btn-action-obs");
+    if (btnObs) {
+      btnObs.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openComparativoModal(emp);
+      });
+    }
 
     tr.addEventListener("click", () => openHoleriteModal(emp));
     dom.tableBody.appendChild(tr);
@@ -2730,6 +2825,454 @@ function openHoleriteModal(emp) {
 function closeHoleriteModal() {
   dom.modalHolerite.classList.add("hidden");
   state.currentModalEmployee = null;
+}
+
+// ========================================================
+// MÓDULO DE OBSERVAÇÕES COMPARATIVAS (OBS)
+// ========================================================
+async function openComparativoModal(emp) {
+  state.currentComparativoEmployee = emp;
+  state.currentCompFilter = "all";
+
+  // Preencher dados cadastrais imediatos do colaborador
+  const rel = state.currentRelatorio || {};
+  if (dom.compEmpNome) dom.compEmpNome.textContent = emp.nome || "Colaborador";
+  if (dom.compEmpCodigoBadge) dom.compEmpCodigoBadge.textContent = emp.codigo ? `Cód: ${emp.codigo}` : "Cód: -";
+  if (dom.compEmpFuncao) dom.compEmpFuncao.textContent = emp.funcao ? `Cargo: ${emp.funcao}` : "Cargo: Não informado";
+  if (dom.compEmpEmpresa) dom.compEmpEmpresa.textContent = `Empresa: ${rel.empresa || "Razão Social"}`;
+  if (dom.compEmpPeriodoAtual) dom.compEmpPeriodoAtual.textContent = `Atual: ${rel.mes_ano || "Folha Atual"}`;
+  if (dom.compEmpPeriodoAnt) dom.compEmpPeriodoAnt.textContent = "Anterior: Localizando...";
+  if (dom.compPeriodoBadge) dom.compPeriodoBadge.textContent = `${rel.mes_ano || "--/----"} vs Anterior`;
+
+  // Limpar e exibir estado de carregamento
+  if (dom.compAlertsContainer) {
+    dom.compAlertsContainer.innerHTML = `
+      <div style="padding: 24px; text-align: center; color: var(--text-muted);">
+        <span class="spinner" style="display:inline-block; margin-right: 8px;"></span>
+        Analisando mudanças comparativas e possíveis pendências em relação ao recibo anterior...
+      </div>
+    `;
+  }
+  if (dom.compEventsTbody) dom.compEventsTbody.innerHTML = "";
+  if (dom.compNoPrevious) dom.compNoPrevious.classList.add("hidden");
+  if (dom.compContentArea) dom.compContentArea.classList.remove("hidden");
+  if (dom.modalComparativo) dom.modalComparativo.classList.remove("hidden");
+  if (dom.compModalBody) dom.compModalBody.scrollTop = 0;
+
+  try {
+    const periodoId = state.currentPeriodoId;
+    let url = `/api/comparativo-recibo?periodo_id=${periodoId}`;
+    if (emp.id) url += `&item_id=${emp.id}`;
+    if (emp.codigo) url += `&codigo=${encodeURIComponent(emp.codigo)}`;
+    if (emp.nome) url += `&nome=${encodeURIComponent(emp.nome)}`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.success || !data.comparativo) {
+      showToast(data.error || "Não foi possível gerar a comparação deste recibo", "error");
+      closeComparativoModal();
+      return;
+    }
+
+    state.currentComparativoData = data.comparativo;
+    renderComparativoModal(data.comparativo);
+  } catch (err) {
+    console.error("Erro ao carregar comparativo:", err);
+    showToast("Erro ao obter dados comparativos do servidor", "error");
+    closeComparativoModal();
+  }
+}
+
+function closeComparativoModal() {
+  if (dom.modalComparativo) dom.modalComparativo.classList.add("hidden");
+  state.currentComparativoEmployee = null;
+  state.currentComparativoData = null;
+}
+
+function renderComparativoModal(comp) {
+  const emp = comp.funcionario || state.currentComparativoEmployee || {};
+  const perAtual = comp.periodo_atual || {};
+  const perAnt = comp.periodo_anterior || {};
+
+  if (dom.compEmpNome) dom.compEmpNome.textContent = emp.nome || "Colaborador";
+  if (dom.compEmpCodigoBadge) dom.compEmpCodigoBadge.textContent = emp.codigo ? `Cód: ${emp.codigo}` : "Cód: -";
+  if (dom.compEmpFuncao) dom.compEmpFuncao.textContent = emp.funcao ? `Cargo: ${emp.funcao}` : "Cargo: Não informado";
+  if (dom.compEmpEmpresa) dom.compEmpEmpresa.textContent = `Empresa: ${perAtual.empresa || "Empresa"}`;
+  if (dom.compEmpPeriodoAtual) dom.compEmpPeriodoAtual.textContent = `Atual: ${perAtual.mes_ano || "--/----"}`;
+
+  // Se NÃO tem recibo anterior cadastrado
+  if (!comp.tem_recibo_anterior) {
+    if (dom.compEmpPeriodoAnt) dom.compEmpPeriodoAnt.textContent = "Anterior: Nenhum";
+    if (dom.compPeriodoBadge) dom.compPeriodoBadge.textContent = `${perAtual.mes_ano || "--/----"} (1º Recibo)`;
+    if (dom.compNoPrevious) dom.compNoPrevious.classList.remove("hidden");
+    if (dom.compNoPreviousMsg) dom.compNoPreviousMsg.textContent = comp.mensagem || "Este colaborador não possui recibo anterior registrado nesta empresa para comparação.";
+    if (dom.compContentArea) dom.compContentArea.classList.add("hidden");
+    return;
+  }
+
+  // Tem recibo anterior
+  if (dom.compNoPrevious) dom.compNoPrevious.classList.add("hidden");
+  if (dom.compContentArea) dom.compContentArea.classList.remove("hidden");
+
+  if (dom.compEmpPeriodoAnt) dom.compEmpPeriodoAnt.textContent = `Anterior: ${perAnt.mes_ano || "--/----"}`;
+  if (dom.compPeriodoBadge) dom.compPeriodoBadge.textContent = `${perAnt.mes_ano} ➔ ${perAtual.mes_ano}`;
+  if (dom.thPrevComp) dom.thPrevComp.textContent = perAnt.mes_ano || "Mês Ant.";
+  if (dom.thCurrComp) dom.thCurrComp.textContent = perAtual.mes_ano || "Mês Atual";
+
+  // 1. Renderizar Alertas Inteligentes
+  const alertas = Array.isArray(comp.alertas) ? comp.alertas : [];
+  if (dom.compAlertsCount) dom.compAlertsCount.textContent = `${alertas.length} diagnóstico(s)`;
+  if (dom.compAlertsContainer) {
+    dom.compAlertsContainer.innerHTML = "";
+    if (alertas.length === 0) {
+      dom.compAlertsContainer.innerHTML = `
+        <div class="comp-alert-card comp-alert-success">
+          <span class="alert-icon">✅</span>
+          <div class="alert-content">
+            <span class="comp-alert-badge">Sem Pendências</span>
+            <h6>Recibo consistente com o mês anterior</h6>
+            <p>Nenhuma anomalia, rubrica esquecida ou mudança abrupta foi detectada.</p>
+          </div>
+        </div>
+      `;
+    } else {
+      alertas.forEach(a => {
+        const div = document.createElement("div");
+        div.className = `comp-alert-card comp-alert-${a.tipo || "info"}`;
+        let icon = "ℹ️";
+        if (a.tipo === "warning") icon = "⚠️";
+        else if (a.tipo === "success") icon = "✨";
+        else if (a.tipo === "danger") icon = "🛑";
+        else if (a.tipo === "primary") icon = "💼";
+
+        div.innerHTML = `
+          <span class="alert-icon">${icon}</span>
+          <div class="alert-content">
+            <span class="comp-alert-badge">${escapeHtml(a.badge || "Diagnóstico")}</span>
+            <h6>${escapeHtml(a.titulo || "")}</h6>
+            <p>${escapeHtml(a.mensagem || "")}</p>
+          </div>
+        `;
+        dom.compAlertsContainer.appendChild(div);
+      });
+    }
+  }
+
+  // 2. Renderizar KPIs Comparativos
+  const totais = comp.totais || {};
+  function renderKpiItem(elemAnt, elemCurr, elemDiff, itemTot, isLiquido = false) {
+    if (!itemTot) return;
+    if (elemAnt) elemAnt.textContent = formatBRL(itemTot.anterior);
+    if (elemCurr) elemCurr.textContent = formatBRL(itemTot.atual);
+    if (elemDiff) {
+      const diffVal = itemTot.diferenca || 0;
+      const pctVal = itemTot.percentual !== undefined ? itemTot.percentual : 0;
+      const sinal = diffVal > 0 ? "+" : "";
+      let diffClass = "diff-neutral";
+      if (Math.abs(diffVal) > 0.005) {
+        if (isLiquido) {
+          diffClass = diffVal > 0 ? "diff-positive-green" : "diff-negative-red";
+        } else {
+          diffClass = diffVal > 0 ? "diff-positive-green" : "diff-negative-red";
+        }
+      }
+      const pctText = Math.abs(pctVal) > 0 ? ` (${sinal}${pctVal.toFixed(1)}%)` : "";
+      elemDiff.className = `comp-kpi-diff ${diffClass}`;
+      elemDiff.textContent = `${sinal}${formatBRL(diffVal)}${pctText}`;
+    }
+  }
+
+  renderKpiItem(dom.compSalAnt, dom.compSalCurr, dom.compSalDiff, totais.salario);
+  renderKpiItem(dom.compProvAnt, dom.compProvCurr, dom.compProvDiff, totais.proventos);
+  renderKpiItem(dom.compDescAnt, dom.compDescCurr, dom.compDescDiff, totais.descontos);
+  renderKpiItem(dom.compLiqAnt, dom.compLiqCurr, dom.compLiqDiff, totais.liquido, true);
+
+  // 3. Atualizar Contadores de Filtro e Tabela
+  const provs = comp.proventos || {};
+  const descs = comp.descontos || {};
+
+  const allItems = [
+    ...(provs.adicionados || []),
+    ...(provs.removidos || []),
+    ...(provs.alterados || []),
+    ...(provs.iguais || []),
+    ...(descs.adicionados || []),
+    ...(descs.removidos || []),
+    ...(descs.alterados || []),
+    ...(descs.iguais || [])
+  ];
+
+  const changesItems = allItems.filter(it => it.status !== "igual");
+  const provItems = allItems.filter(it => it.tipo === "provento");
+  const descItems = allItems.filter(it => it.tipo === "desconto");
+
+  if (dom.countAll) dom.countAll.textContent = allItems.length;
+  if (dom.countChanges) dom.countChanges.textContent = changesItems.length;
+  if (dom.countProv) dom.countProv.textContent = provItems.length;
+  if (dom.countDesc) dom.countDesc.textContent = descItems.length;
+
+  if (changesItems.length > 0) {
+    state.currentCompFilter = "changes";
+  } else {
+    state.currentCompFilter = "all";
+  }
+
+  if (dom.compFilterPills) {
+    dom.compFilterPills.querySelectorAll(".comp-pill").forEach(p => {
+      p.classList.toggle("active", p.dataset.filter === state.currentCompFilter);
+    });
+  }
+
+  renderComparativoTable();
+}
+
+function renderComparativoTable() {
+  if (!state.currentComparativoData || !dom.compEventsTbody) return;
+  const comp = state.currentComparativoData;
+  const provs = comp.proventos || {};
+  const descs = comp.descontos || {};
+
+  const allItems = [
+    ...(provs.adicionados || []),
+    ...(provs.removidos || []),
+    ...(provs.alterados || []),
+    ...(provs.iguais || []),
+    ...(descs.adicionados || []),
+    ...(descs.removidos || []),
+    ...(descs.alterados || []),
+    ...(descs.iguais || [])
+  ];
+
+  let filtered = allItems;
+  if (state.currentCompFilter === "changes") {
+    filtered = allItems.filter(it => it.status !== "igual");
+  } else if (state.currentCompFilter === "proventos") {
+    filtered = allItems.filter(it => it.tipo === "provento");
+  } else if (state.currentCompFilter === "descontos") {
+    filtered = allItems.filter(it => it.tipo === "desconto");
+  }
+
+  const statusPriority = { removido: 1, adicionado: 2, alterado: 3, igual: 4 };
+  filtered.sort((a, b) => {
+    const prioA = statusPriority[a.status] || 9;
+    const prioB = statusPriority[b.status] || 9;
+    if (prioA !== prioB) return prioA - prioB;
+    return (a.descricao || "").localeCompare(b.descricao || "");
+  });
+
+  dom.compEventsTbody.innerHTML = "";
+
+  if (filtered.length === 0) {
+    dom.compEventsTbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">
+          Nenhuma rubrica encontrada para o filtro selecionado.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  filtered.forEach(it => {
+    const tr = document.createElement("tr");
+    const isProv = it.tipo === "provento";
+    const status = it.status;
+
+    let statusBadgeHtml = "";
+    if (status === "adicionado") {
+      statusBadgeHtml = `<span class="badge-status badge-status-added">🟢 + NOVO ${isProv ? "CRÉDITO" : "DÉBITO"}</span>`;
+    } else if (status === "removido") {
+      statusBadgeHtml = `<span class="badge-status badge-status-removed">⚠️ AUSENTE / REMOVIDO</span>`;
+    } else if (status === "alterado") {
+      statusBadgeHtml = `<span class="badge-status badge-status-changed">🔵 ALTERADO</span>`;
+    } else {
+      statusBadgeHtml = `<span class="badge-status badge-status-same">⚪ INALTERADO</span>`;
+    }
+
+    const typeBadgeHtml = isProv
+      ? `<span class="rubrica-type-tag rubrica-type-provento">Crédito</span>`
+      : `<span class="rubrica-type-tag rubrica-type-desconto">Débito</span>`;
+
+    const valAntStr = status === "adicionado" ? `<span class="text-muted">-</span>` : formatBRL(it.valor_anterior);
+    const refAntStr = it.referencia_anterior && it.referencia_anterior !== "-" ? `<small class="text-muted"> (${it.referencia_anterior})</small>` : "";
+
+    const valCurrStr = status === "removido" ? `<span class="text-danger font-semibold">NÃO CONSTA</span>` : formatBRL(it.valor_atual);
+    const refCurrStr = it.referencia_atual && it.referencia_atual !== "-" ? `<small class="text-muted"> (${it.referencia_atual})</small>` : "";
+
+    let diffStr = "-";
+    let diffClass = "text-muted";
+    if (status !== "igual") {
+      const d = it.diferenca || 0;
+      const sinal = d > 0 ? "+" : "";
+      diffStr = `${sinal}${formatBRL(d)}`;
+      if (status === "removido") diffClass = "text-danger font-bold";
+      else if (status === "adicionado") diffClass = "text-success font-bold";
+      else diffClass = d > 0 ? "text-success font-bold" : "text-danger font-bold";
+    }
+
+    tr.innerHTML = `
+      <td class="col-cod text-center font-mono text-muted">${it.codigo || "-"}</td>
+      <td class="col-desc">
+        <strong>${escapeHtml(it.descricao || "")}</strong>
+      </td>
+      <td class="col-tipo text-center">${typeBadgeHtml}</td>
+      <td class="col-ant text-right font-mono">${valAntStr}${refAntStr}</td>
+      <td class="col-curr text-right font-mono">${valCurrStr}${refCurrStr}</td>
+      <td class="col-diff text-right font-mono ${diffClass}">${diffStr}</td>
+      <td class="col-status text-center">${statusBadgeHtml}</td>
+    `;
+    dom.compEventsTbody.appendChild(tr);
+  });
+}
+
+function printComparativo() {
+  if (!state.currentComparativoData) return;
+  const comp = state.currentComparativoData;
+  const emp = comp.funcionario || {};
+  const perAtual = comp.periodo_atual || {};
+  const perAnt = comp.periodo_anterior || {};
+  const totais = comp.totais || {};
+  const alertas = Array.isArray(comp.alertas) ? comp.alertas : [];
+
+  const printWindow = window.open("", "_blank", "width=920,height=800");
+  if (!printWindow) {
+    showToast("Permita pop-ups no navegador para imprimir o relatório comparativo", "error");
+    return;
+  }
+
+  const provs = comp.proventos || {};
+  const descs = comp.descontos || {};
+  const allItems = [
+    ...(provs.adicionados || []),
+    ...(provs.removidos || []),
+    ...(provs.alterados || []),
+    ...(provs.iguais || []),
+    ...(descs.adicionados || []),
+    ...(descs.removidos || []),
+    ...(descs.alterados || []),
+    ...(descs.iguais || [])
+  ];
+
+  let alertasHtml = "";
+  if (alertas.length > 0) {
+    alertasHtml = `
+      <div style="margin-bottom: 20px; border: 1px solid #f59e0b; background: #fffbeb; padding: 12px 16px; border-radius: 6px;">
+        <h4 style="margin: 0 0 8px 0; color: #b45309; font-size: 13px;">🔔 Diagnóstico e Alertas de Mudanças:</h4>
+        <ul style="margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.5; color: #78350f;">
+          ${alertas.map(a => `<li><strong>${escapeHtml(a.titulo)}:</strong> ${escapeHtml(a.mensagem)}</li>`).join("")}
+        </ul>
+      </div>
+    `;
+  }
+
+  let rowsHtml = allItems.map(it => {
+    const isProv = it.tipo === "provento";
+    const status = it.status;
+    let stText = "INALTERADO";
+    let stColor = "#666";
+    if (status === "adicionado") { stText = "+ ADICIONADO"; stColor = "#047857"; }
+    else if (status === "removido") { stText = "⚠️ REMOVIDO / AUSENTE"; stColor = "#b91c1c"; }
+    else if (status === "alterado") { stText = "ALTERADO"; stColor = "#1d4ed8"; }
+
+    return `
+      <tr>
+        <td style="text-align:center; font-family:monospace;">${it.codigo || "-"}</td>
+        <td><strong>${escapeHtml(it.descricao)}</strong></td>
+        <td style="text-align:center; font-size:10px;">${isProv ? 'CRÉDITO' : 'DÉBITO'}</td>
+        <td style="text-align:right; font-family:monospace;">${status === 'adicionado' ? '-' : formatBRL(it.valor_anterior)}</td>
+        <td style="text-align:right; font-family:monospace;">${status === 'removido' ? 'NÃO CONSTA' : formatBRL(it.valor_atual)}</td>
+        <td style="text-align:right; font-family:monospace; font-weight:bold; color:${status === 'removido' ? '#b91c1c' : (it.diferenca > 0 ? '#047857' : '#333')};">
+          ${status === 'igual' ? '-' : (it.diferenca > 0 ? '+' : '') + formatBRL(it.diferenca)}
+        </td>
+        <td style="text-align:center; font-weight:bold; font-size:10px; color:${stColor};">${stText}</td>
+      </tr>
+    `;
+  }).join("");
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Observações Comparativas - ${emp.nome}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 25px; color: #111; font-size: 11px; line-height: 1.4; }
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 16px; }
+        .emp-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+        .kpi-row { display: flex; gap: 12px; margin-bottom: 16px; }
+        .kpi-box { flex: 1; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; text-align: center; }
+        .kpi-title { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; }
+        .kpi-val { font-size: 13px; font-weight: bold; margin-top: 4px; font-family: monospace; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 11px; }
+        th { background: #f1f5f9; text-transform: uppercase; font-size: 10px; }
+        @media print { body { padding: 0; } }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <h2 style="margin:0 0 4px 0; color:#1e293b;">RELATÓRIO COMPARATIVO DE RECIBOS</h2>
+          <span style="color:#64748b;">${escapeHtml(perAtual.empresa || "")}</span>
+        </div>
+        <div style="text-align:right;">
+          <strong>Comparativo: ${escapeHtml(perAnt.mes_ano || "")} ➔ ${escapeHtml(perAtual.mes_ano || "")}</strong><br>
+          <span style="color:#64748b; font-size:10px;">Emitido em: ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}</span>
+        </div>
+      </div>
+
+      <div class="emp-box">
+        <strong>Colaborador:</strong> ${escapeHtml(emp.nome || "")} (Cód: ${emp.codigo || "-"}) | 
+        <strong>Cargo:</strong> ${escapeHtml(emp.funcao || "-")}<br>
+        <strong>Período Atual:</strong> ${escapeHtml(perAtual.periodo_texto || "")}
+      </div>
+
+      ${alertasHtml}
+
+      <div class="kpi-row">
+        <div class="kpi-box">
+          <div class="kpi-title">Salário Base</div>
+          <div class="kpi-val">${formatBRL(totais.salario?.anterior)} ➔ ${formatBRL(totais.salario?.atual)}</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-title">Proventos (Créditos)</div>
+          <div class="kpi-val">${formatBRL(totais.proventos?.anterior)} ➔ ${formatBRL(totais.proventos?.atual)}</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-title">Descontos (Débitos)</div>
+          <div class="kpi-val">${formatBRL(totais.descontos?.anterior)} ➔ ${formatBRL(totais.descontos?.atual)}</div>
+        </div>
+        <div class="kpi-box" style="background: #f0fdf4; border-color: #86efac;">
+          <div class="kpi-title" style="color:#166534;">Total Líquido</div>
+          <div class="kpi-val" style="color:#166534;">${formatBRL(totais.liquido?.anterior)} ➔ ${formatBRL(totais.liquido?.atual)}</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Cód</th>
+            <th>Rubrica / Descrição</th>
+            <th>Tipo</th>
+            <th>Anterior (${escapeHtml(perAnt.mes_ano || "")})</th>
+            <th>Atual (${escapeHtml(perAtual.mes_ano || "")})</th>
+            <th>Diferença</th>
+            <th>Situação</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <script>
+        window.onload = function() { window.print(); };
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 function printHoleriteIndividual() {

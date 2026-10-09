@@ -172,8 +172,14 @@ def run_tests():
     assert st == 200 and res.get("success") is True, f"POST /api/demo-12-meses falhou: {res}"
     print(" [OK] 20. Rota POST /api/demo-12-meses funcionando")
 
+    # 21. Teste GET /api/comparativo-recibo
+    st, res = request("GET", "/api/comparativo-recibo?periodo_id=24&codigo=240", token=alias_token)
+    assert st == 200 and res.get("success") is True, f"GET /api/comparativo-recibo falhou: {res}"
+    assert "comparativo" in res and res["comparativo"].get("tem_recibo_anterior") is True, f"Comparativo inválido: {res}"
+    print(" [OK] 21. Rota GET /api/comparativo-recibo funcionando (OBS)")
+
     print("\n========================================================")
-    print("  TODOS OS 20 TESTES DE ROTAS E AUTENTICAÇÃO PASSARAM!")
+    print("  TODOS OS 21 TESTES DE ROTAS E AUTENTICAÇÃO PASSARAM!")
     print("========================================================\n")
     httpd.shutdown()
 
