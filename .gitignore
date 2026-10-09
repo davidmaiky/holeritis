@@ -28,6 +28,7 @@ data/*.db
 data/*.db-journal
 uploads/*
 !uploads/.gitkeep
+modelo/*
 
 # IDE e logs
 .idea/
